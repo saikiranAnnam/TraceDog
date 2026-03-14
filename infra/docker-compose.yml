@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tracedog
+      POSTGRES_PASSWORD: tracedog
+      POSTGRES_DB: tracedog
+    ports:
+      - "5432:5432"
+    volumes:
+      - tracedog_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracedog -d tracedog"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://tracedog:tracedog@postgres:5432/tracedog
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  tracedog_pg:
