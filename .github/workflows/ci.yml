@@ -78,7 +78,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: dashboard/package-lock.json
+          # Use a path that always exists; `package-lock.json` may not be committed yet.
+          cache-dependency-path: dashboard/package.json
 
       - name: Install dependencies
         run: |
