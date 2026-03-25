@@ -1,5 +1,10 @@
 """Shared fixtures: SQLite test DB, sessions, HTTP client with DB override."""
 
+import os
+
+# Before any `app` import: deterministic, lightweight similarity in CI.
+os.environ.setdefault("SIMILARITY_BACKEND", "tfidf")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
