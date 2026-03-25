@@ -18,10 +18,22 @@ class Trace(Base):
     model_name: Mapped[str] = mapped_column(String(128), nullable=False)
     latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="processed")
-    retrieved_docs: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    ingest_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     agent: Mapped[Agent] = relationship(back_populates="traces")
     reliability_result: Mapped[Any] = relationship(
         "ReliabilityResult", back_populates="trace", uselist=False
+    )
+    retrieved_documents: Mapped[list[Any]] = relationship(
+        "RetrievedDocument",
+        back_populates="trace",
+        cascade="all, delete-orphan",
+        order_by="RetrievedDocument.position",
+    )
+    spans: Mapped[list[Any]] = relationship(
+        "TraceSpan",
+        back_populates="trace",
+        cascade="all, delete-orphan",
+        order_by="TraceSpan.position",
     )
