@@ -61,6 +61,12 @@ class TraceListItem(BaseModel):
     created_at: str
     reliability_score: float | None
     hallucination_risk: float | None
+    grounding_score: float | None = None
+    failure_type: str | None = None
+    experiment_tag: str | None = Field(
+        default=None,
+        description="Short label from ingest_metadata (title, case_id, experiment, …).",
+    )
 
     model_config = {"from_attributes": False}
 

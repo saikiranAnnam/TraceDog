@@ -17,6 +17,16 @@ from app.tracing.default_spans import build_default_spans
 from app.utils.ids import new_trace_id
 
 
+def _experiment_tag_from_metadata(meta: dict | None) -> str | None:
+    if not meta:
+        return None
+    for key in ("title", "case_id", "experiment", "experiment_name", "dataset"):
+        val = meta.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()[:160]
+    return None
+
+
 def ingest_trace(db: Session, payload: TraceCreate) -> TraceCreateResponse:
     agent = agent_repository.get_or_create_agent(
         db, payload.agent_name, payload.environment
@@ -121,6 +131,9 @@ def list_traces_for_api(db: Session, skip: int = 0, limit: int = 100) -> list[Tr
                 created_at=t.created_at.isoformat() if t.created_at else "",
                 reliability_score=rr.reliability_score if rr else None,
                 hallucination_risk=rr.hallucination_risk if rr else None,
+                grounding_score=rr.grounding_score if rr else None,
+                failure_type=rr.failure_type if rr else None,
+                experiment_tag=_experiment_tag_from_metadata(t.ingest_metadata),
             )
         )
     return out
