@@ -1,6 +1,6 @@
 <h1 align="center">TraceDog</h1>
 
-<p align="center"><strong>Observability and Reliability for AI agents.</strong></p>
+<p align="center"><strong> LLM Evaluation and AI Observability Platform</strong></p>
 
 <p align="center">
   <img src="public/icons/TraceDogAppleIcon.png" alt="TraceDog"/>
