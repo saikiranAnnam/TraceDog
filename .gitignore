@@ -8,3 +8,11 @@ venv/
 backend/.venv/
 node_modules/
 .next/
+
+# Pulumi (IaC) state/config
+.pulumi/
+Pulumi.*.yaml
+Pulumi.*.json
+
+# Pulumi local state snapshot (contains sensitive outputs)
+infra/pulumi/tracedog-infra
