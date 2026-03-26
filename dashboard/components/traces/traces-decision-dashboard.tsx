@@ -24,6 +24,7 @@ import {
   SuccessDonutChart,
 } from "@/components/traces/trace-dashboard-charts";
 import { ModelComparisonPanel } from "@/components/traces/model-comparison-panel";
+import { AdminSmokeExperiment } from "@/components/traces/admin-smoke-experiment";
 
 function MiniBar({ value }: { value: number | null }) {
   const v = value == null ? null : Math.max(0, Math.min(1, value));
@@ -88,6 +89,8 @@ export function TracesDecisionDashboard({ traces }: { traces: TraceListItem[] })
         </div>
         <span className="td-traces-badge">{traces.length} loaded</span>
       </header>
+
+      <AdminSmokeExperiment />
 
       <section className="td-summary-grid" aria-label="Summary metrics">
         <div className="td-summary-card">
