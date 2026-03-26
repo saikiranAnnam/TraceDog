@@ -3,8 +3,9 @@ services:
     name: tracedog-api
     runtime: docker
     rootDir: backend
-    dockerfilePath: backend/Dockerfile
-    dockerContext: backend
+    # Paths below are relative to rootDir (not the repo root).
+    dockerfilePath: Dockerfile
+    dockerContext: .
     plan: starter
     autoDeployTrigger: commit
     healthCheckPath: /api/v1/health
