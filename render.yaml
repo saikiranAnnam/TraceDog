@@ -3,6 +3,8 @@ services:
     name: tracedog-api
     runtime: docker
     rootDir: backend
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
     plan: starter
     autoDeployTrigger: commit
     healthCheckPath: /api/v1/health
