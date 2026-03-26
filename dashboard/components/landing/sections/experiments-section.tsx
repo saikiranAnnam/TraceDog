@@ -23,7 +23,19 @@ const panels = [
   },
 ] as const;
 
-export function ExperimentsSection() {
+const defaultExperimentNotesLink = {
+  href: "/experiments",
+  label: "Experiment notes & methodology",
+} as const;
+
+export type ExperimentsSectionProps = {
+  /** Set to `null` to hide; override href/label on the standalone experiments page. */
+  experimentNotesLink?: { href: string; label: string } | null;
+};
+
+export function ExperimentsSection({
+  experimentNotesLink = defaultExperimentNotesLink,
+}: ExperimentsSectionProps = {}) {
   return (
     <section id="experiments" className="ld-section ld-section--alt ld-exp-section">
       <div className="ld-container">
@@ -49,7 +61,9 @@ export function ExperimentsSection() {
           ))}
         </div>
         <p className="ld-exp-links">
-          <Link href="/experiments">Experiment notes &amp; methodology</Link>
+          {experimentNotesLink ? (
+            <Link href={experimentNotesLink.href}>{experimentNotesLink.label}</Link>
+          ) : null}
           <Link href="/docs">Scoring &amp; algorithms in docs</Link>
         </p>
       </div>

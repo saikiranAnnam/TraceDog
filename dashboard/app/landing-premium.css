@@ -62,6 +62,12 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+.ld-root--app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
 
 .ld-root ::selection {
   background: rgba(99, 102, 241, 0.35);
@@ -191,6 +197,45 @@
 .ld-btn--outline:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.28);
+}
+.ld-btn--ghost.ld-btn--active {
+  background: rgba(34, 211, 238, 0.12);
+  border-color: rgba(34, 211, 238, 0.38);
+  color: #e0f2fe;
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.08);
+}
+
+/* App dashboard (traces, overview) — same shell as marketing */
+.ld-root--app .ld-dashboard-main {
+  flex: 1;
+  width: 100%;
+}
+.ld-dashboard-main {
+  padding: 1.75rem 0 3.5rem;
+  min-height: calc(100vh - 4rem);
+  min-height: calc(100dvh - 4rem);
+}
+.ld-container--dashboard {
+  max-width: min(1800px, 100%) !important;
+  padding-left: clamp(1rem, 4vw, 1.5rem);
+  padding-right: clamp(1rem, 4vw, 1.5rem);
+}
+.ld-dashboard-main .td-traces-page {
+  max-width: none;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  color: var(--ld-copy-prose);
+}
+.ld-dashboard-main .trace-debugger {
+  max-width: 100%;
+  background: transparent;
+  margin: 0;
+  padding-top: 0;
+  min-height: auto;
 }
 
 /* Hero */
@@ -639,6 +684,12 @@
   margin-bottom: 2.75rem;
   max-width: 40rem;
   line-height: 1.5;
+}
+.ld-sub--left {
+  margin-left: 0;
+  margin-right: 0;
+  text-align: left;
+  max-width: 42rem;
 }
 .ld-sub--loop {
   margin-bottom: 2.85rem;
