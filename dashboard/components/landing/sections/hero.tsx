@@ -82,7 +82,7 @@ export function HeroSection() {
             </div>
             <dl className="ld-hero-metrics" aria-label="Signals from evaluation runs">
               <div className="ld-hero-metric">
-                <dt>Hallucination risk (eval)</dt>
+                <dt>Hallucination risk</dt>
                 <dd>
                   <span className="ld-hero-metric-from">38%</span>
                   <span className="ld-hero-metric-arrow" aria-hidden>

@@ -9,9 +9,13 @@ export function ProofStrip() {
           <li>Open-source, developer-first</li>
         </ul>
         <div className="ld-pills" aria-hidden>
-          <span className="ld-pill">GPT-4o-mini</span>
+          <span className="ld-pill">OpenAI</span>
           <span className="ld-pill">Claude</span>
+          <span className="ld-pill">Gemini</span>
+          <span className="ld-pill">Llama</span>
+          <span className="ld-pill">Mistral</span>
           <span className="ld-pill">SQuAD v2</span>
+          <span className="ld-pill">TruthfulQA</span>
           <span className="ld-pill">FastAPI</span>
           <span className="ld-pill">Next.js</span>
           <span className="ld-pill">PostgreSQL</span>
