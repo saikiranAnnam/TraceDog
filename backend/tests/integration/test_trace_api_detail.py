@@ -16,6 +16,12 @@ def test_detail_returns_full_trace(client):
     assert data["prompt"] == SUPPORTED_RESPONSE["prompt"]
     assert data["response"] == SUPPORTED_RESPONSE["response"]
     assert data["retrieved_docs"]
+    assert data["retrieved_docs"][0].get("similarity_score") is not None
+    assert "explanation" in data
+    assert data["explanation"]
+    assert "spans" in data
+    assert isinstance(data["spans"], list)
+    assert len(data["spans"]) >= 1
 
 
 @pytest.mark.integration

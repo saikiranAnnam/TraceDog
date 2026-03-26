@@ -3,8 +3,10 @@
 import pytest
 
 from app.models.agent import Agent
+from app.models.retrieved_document import RetrievedDocument
 from app.models.reliability_result import ReliabilityResult
 from app.models.trace import Trace
+from app.models.trace_span import TraceSpan
 from app.services.trace_service import (
     get_trace_detail,
     ingest_trace,
@@ -32,6 +34,70 @@ def test_ingest_stores_trace_and_reliability(db_session):
     assert rr.grounding_score == out.grounding_score
     assert rr.reliability_score == out.reliability_score
 
+    docs = (
+        db_session.query(RetrievedDocument)
+        .filter_by(trace_id=out.trace_id)
+        .order_by(RetrievedDocument.position.asc())
+        .all()
+    )
+    assert len(docs) == len(p.retrieved_docs)
+    assert docs[0].doc_id == p.retrieved_docs[0].doc_id
+    assert docs[0].similarity_score is not None
+
+    spans = (
+        db_session.query(TraceSpan)
+        .filter_by(trace_id=out.trace_id)
+        .order_by(TraceSpan.position.asc())
+        .all()
+    )
+    assert len(spans) >= 1
+    types = [s.span_type for s in spans]
+    assert "llm" in types
+    assert "retriever" in types
+
+
+def test_default_spans_llm_only_when_no_retrieval(db_session):
+    from app.schemas.trace import TraceCreate
+
+    p = TraceCreate(
+        agent_name="a",
+        environment="dev",
+        prompt="hi",
+        response="hello",
+        model_name="gpt-4",
+        latency_ms=100,
+        retrieved_docs=[],
+    )
+    out = ingest_trace(db_session, p)
+    spans = (
+        db_session.query(TraceSpan).filter_by(trace_id=out.trace_id).order_by(TraceSpan.position).all()
+    )
+    assert len(spans) == 1
+    assert spans[0].span_type == "llm"
+
+
+def test_explicit_spans_override_defaults(db_session):
+    from app.schemas.trace import SpanInput, TraceCreate
+
+    p = TraceCreate(
+        agent_name="a",
+        environment="dev",
+        prompt="p",
+        response="r",
+        model_name="gpt-4",
+        latency_ms=500,
+        retrieved_docs=[],
+        spans=[
+            SpanInput(span_type="tool", label="search", duration_ms=120, status="ok"),
+            SpanInput(span_type="llm", label="generate", duration_ms=380, status="ok"),
+        ],
+    )
+    out = ingest_trace(db_session, p)
+    spans = (
+        db_session.query(TraceSpan).filter_by(trace_id=out.trace_id).order_by(TraceSpan.position).all()
+    )
+    assert [s.span_type for s in spans] == ["tool", "llm"]
+
 
 def test_agent_reused_same_name_env(db_session):
     ingest_trace(db_session, trace_create_supported())
@@ -57,6 +123,7 @@ def test_get_detail_by_id(db_session):
     assert d.prompt == SUPPORTED_RESPONSE["prompt"]
     assert d.response == SUPPORTED_RESPONSE["response"]
     assert len(d.retrieved_docs) >= 1
+    assert len(d.spans) >= 1
 
 
 def test_get_detail_unknown_returns_none(db_session):

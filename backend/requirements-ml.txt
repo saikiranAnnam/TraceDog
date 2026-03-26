@@ -1,0 +1,3 @@
+# Optional: real embeddings (pulls torch). Use when SIMILARITY_BACKEND=sentence_transformers or auto with ST installed.
+-r requirements.txt
+sentence-transformers>=3.0.0
