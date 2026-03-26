@@ -9,6 +9,9 @@ export type TraceListItem = {
   created_at: string;
   reliability_score: number | null;
   hallucination_risk: number | null;
+  grounding_score?: number | null;
+  failure_type?: string | null;
+  experiment_tag?: string | null;
 };
 
 export type TraceSpan = {

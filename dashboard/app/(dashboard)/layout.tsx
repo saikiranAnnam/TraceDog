@@ -1,6 +1,6 @@
 import { DashboardChrome } from "@/components/dashboard-chrome";
 
-export default function TracesLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;

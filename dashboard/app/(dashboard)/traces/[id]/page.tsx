@@ -17,7 +17,7 @@ export default async function TraceDetailPage({
 
   if (err || !t) {
     return (
-      <div className="trace-detail">
+      <div className="trace-debugger">
         <Link href="/traces">← Traces</Link>
         <h1>Trace</h1>
         <p>{err}</p>
