@@ -12,6 +12,11 @@ export type TraceListItem = {
   grounding_score?: number | null;
   failure_type?: string | null;
   experiment_tag?: string | null;
+  eval_fetch_ms?: number | null;
+  eval_rows_quarantined?: number | null;
+  eval_cache_hit?: boolean | null;
+  /** SEV-1 … SEV-5 incident severity when present */
+  severity?: string | null;
 };
 
 export type TraceSpan = {
@@ -21,6 +26,34 @@ export type TraceSpan = {
   duration_ms: number | null;
   status: string | null;
   meta?: Record<string, unknown> | null;
+};
+
+export type ClaimGraphPayload = {
+  trace_id: string;
+  nodes: Array<{
+    id: string;
+    type?: string;
+    position: { x: number; y: number };
+    data?: Record<string, unknown>;
+  }>;
+  edges: Array<{
+    id: string;
+    source: string;
+    target: string;
+    label?: string;
+    data?: Record<string, unknown>;
+  }>;
+};
+
+export type ClaimGroundingItem = {
+  claim_text: string;
+  best_doc_id?: string | null;
+  best_evidence_span?: string | null;
+  support_score: number;
+  contradiction_score: number;
+  label: string;
+  grounding_mode?: string | null;
+  short_answer_flag?: boolean | null;
 };
 
 export type TraceDetail = TraceListItem & {
@@ -37,4 +70,14 @@ export type TraceDetail = TraceListItem & {
   failure_type: string | null;
   explanation?: string | null;
   ingest_metadata?: Record<string, unknown> | null;
+  claim_grounding?: {
+    claims: ClaimGroundingItem[];
+    response_groundedness: number;
+    unsupported_ratio: number;
+    grounding_mode?: string | null;
+  } | null;
+  grounding_layers?: Record<string, unknown> | null;
+  failure_reason?: string | null;
+  /** Hybrid scorer + RCA + repair policy (API `reliability_insights`). */
+  reliability_insights?: Record<string, unknown> | null;
 };

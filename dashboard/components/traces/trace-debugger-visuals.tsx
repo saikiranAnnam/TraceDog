@@ -18,7 +18,7 @@ export function GroundingSpectrumVisual({
   const tWeakPct = weakThreshold * 100;
 
   return (
-    <div className={`tdv-spectrum tdv-card tdv-card--lift ${className}`.trim()}>
+    <div className={`tdv-spectrum tdv-card ${className}`.trim()}>
       <div className="tdv-spectrum-label-row">
         <span className="tdv-card-title">Grounding vs thresholds</span>
         <span
@@ -33,7 +33,7 @@ export function GroundingSpectrumVisual({
         role="img"
         aria-label={`Grounding ${score.toFixed(2)}, weak below ${weakThreshold}, strong from ${strongThreshold}`}
       >
-        <div className="tdv-spectrum-gradient" />
+        <div className="tdv-spectrum-fill" style={{ width: `${pct}%` }} />
         <div
           className="tdv-spectrum-tick tdv-spectrum-tick--weak"
           style={{ left: `${tWeakPct}%` }}
@@ -77,7 +77,7 @@ export function ContributionBlendVisual({
   const sw = Math.round(sentenceWeight * 100);
   const kw = Math.round(keywordWeight * 100);
   return (
-    <div className={`tdv-contrib tdv-card tdv-card--lift ${className}`.trim()}>
+    <div className={`tdv-contrib tdv-card ${className}`.trim()}>
       <span className="tdv-card-title">Blend contribution</span>
       <div
         className="tdv-contrib-stack"
@@ -161,7 +161,7 @@ export function ExecutionTimelineVisual({
 }) {
   if (segments.length === 0) {
     return (
-      <div className="tdv-exec tdv-card tdv-card--lift">
+      <div className="tdv-exec tdv-card">
         <span className="tdv-card-title">Execution runtime</span>
         <p className="tdv-muted" style={{ margin: "0.35rem 0 0" }}>
           No spans recorded.
@@ -170,7 +170,7 @@ export function ExecutionTimelineVisual({
     );
   }
   return (
-    <div className="tdv-exec tdv-card tdv-card--lift">
+    <div className="tdv-exec tdv-card">
       <span className="tdv-card-title">Execution runtime</span>
       <p className="tdv-exec-total-caption">
         Total <strong>{totalMs}ms</strong>
@@ -212,12 +212,12 @@ export function ConfidenceSparklineVisual({ score }: { score: number | null }) {
     return `${x},${y}`;
   });
   return (
-    <div className="tdv-sparkline-card tdv-card tdv-card--lift">
-      <span className="tdv-card-title">Confidence trend</span>
+    <div className="tdv-sparkline-card tdv-card">
+      <span className="tdv-card-title">Score (static series)</span>
       <p className="tdv-sparkline-hint">
         {score != null
-          ? "Series padded from this trace’s score — batch view shows drift."
-          : "No grounding score — illustrative curve."}
+          ? "Placeholder series from this trace — fleet trends need batch metrics."
+          : "No grounding score."}
       </p>
       <svg
         className="tdv-sparkline"
@@ -225,25 +225,15 @@ export function ConfidenceSparklineVisual({ score }: { score: number | null }) {
         width="100%"
         height={h}
         role="img"
-        aria-label="Confidence sparkline"
+        aria-label="Score line"
       >
-        <defs>
-          <linearGradient id="tdv-spark-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
         <polyline
           fill="none"
-          stroke="#22d3ee"
-          strokeWidth="2"
+          stroke="#6b7280"
+          strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
           points={pts.join(" ")}
-        />
-        <polygon
-          fill="url(#tdv-spark-fill)"
-          points={`${pad},${h - pad} ${pts.join(" ")} ${w - pad},${h - pad}`}
         />
       </svg>
     </div>
@@ -268,11 +258,9 @@ export function FailureMixVisual({ trace }: { trace: TraceDetail }) {
     ok = 100;
   }
   return (
-    <div className="tdv-failure-card tdv-card tdv-card--lift">
-      <span className="tdv-card-title">Failure mix (this trace)</span>
-      <p className="tdv-sparkline-hint">
-        One bar — fleet-wide % needs aggregate metrics from the API.
-      </p>
+    <div className="tdv-failure-card tdv-card">
+      <span className="tdv-card-title">Classification (this trace)</span>
+      <p className="tdv-sparkline-hint">Single-trace snapshot. Fleet view needs aggregates.</p>
       <div
         className="tdv-failure-stack"
         role="img"

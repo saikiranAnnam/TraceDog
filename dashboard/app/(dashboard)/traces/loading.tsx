@@ -1,6 +1,6 @@
 export default function TracesLoading() {
   return (
-    <div className="td-skeleton-wrap td-traces-page">
+    <div className="trace-debugger td-traces-page td-skeleton-wrap">
       <div className="td-skeleton-line" style={{ width: "40%" }} />
       <div className="td-skeleton-line td-skeleton-line--short" />
       <div

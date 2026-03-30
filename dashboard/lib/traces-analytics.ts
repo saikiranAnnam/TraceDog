@@ -147,11 +147,25 @@ export function riskHistogram(traces: TraceListItem[]): RiskBucket[] {
     else if (r < 0.66) med++;
     else high++;
   }
-  const total = low + med + high || 1;
   return [
-    { label: "Low", count: low, color: "#22c55e" },
-    { label: "Med", count: med, color: "#fbbf24" },
-    { label: "High", count: high, color: "#fb7185" },
+    {
+      label: "Low",
+      count: low,
+      color:
+        "linear-gradient(to top, rgba(16,185,129,0.14), rgba(16,185,129,0.42))",
+    },
+    {
+      label: "Med",
+      count: med,
+      color:
+        "linear-gradient(to top, rgba(245,158,11,0.14), rgba(245,158,11,0.44))",
+    },
+    {
+      label: "High",
+      count: high,
+      color:
+        "linear-gradient(to top, rgba(248,113,113,0.14), rgba(239,68,68,0.4))",
+    },
   ];
 }
 
@@ -290,15 +304,16 @@ export function modelColor(model: string, palette: readonly string[]): string {
   return palette[Math.abs(h) % palette.length]!;
 }
 
+/** Muted, distinguishable — charts and scatter (not full-saturation UI). */
 export const MODEL_PALETTE = [
-  "#22d3ee",
-  "#a78bfa",
-  "#34d399",
-  "#fb923c",
-  "#f472b6",
-  "#60a5fa",
-  "#fbbf24",
-  "#2dd4bf",
+  "#5eb8c8",
+  "#9b8bc4",
+  "#5cb896",
+  "#c49a6a",
+  "#c97fa8",
+  "#6b9fd4",
+  "#c9a85c",
+  "#5cafa0",
 ] as const;
 
 export function pickBestModels(

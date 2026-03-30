@@ -1,18 +1,14 @@
-import Link from "next/link";
 import { ExplanationBody } from "@/lib/format-explanation";
 import { docExcerpt, highlightExcerpt } from "@/lib/excerpt-highlight";
 import { parseExplanationMetrics, explanationLeadParagraph } from "@/lib/parse-explanation-metrics";
 import { buildExecutionSegments } from "@/lib/trace-execution-segments";
 import {
-  groundingStrengthLabel,
   heroOneLiner,
   recommendedAction,
   reliabilityLabel,
   responseSupportNote,
-  riskLabel,
+  rootCauseConclusion,
   shortWhyParagraph,
-  verdictPillLabel,
-  whySectionTitle,
 } from "@/lib/trace-hero-copy";
 import {
   docSimilarityTier,
@@ -20,23 +16,67 @@ import {
   qualityTier,
   THRESHOLD_STRONG,
   THRESHOLD_WEAK,
+  type QualityTier,
 } from "@/lib/trace-quality";
-import type { TraceDetail } from "@/lib/types";
+import type { ClaimGraphPayload, TraceDetail } from "@/lib/types";
+import { ClaimGraphSection } from "@/components/traces/claim-graph-section";
+import { TraceMetadataKvList } from "@/components/traces/trace-metadata-kv";
 import { TraceCollapsibleSection } from "@/components/traces/trace-collapsible-section";
 import {
-  ConfidenceSparklineVisual,
   ContributionBlendVisual,
   ExecutionTimelineVisual,
   FailureMixVisual,
   GroundingSpectrumVisual,
 } from "@/components/traces/trace-debugger-visuals";
 
-function tierWord(t: "good" | "medium" | "bad" | null) {
-  if (!t) return "";
-  return t === "good" ? "Good" : t === "medium" ? "Medium" : "Poor";
+function statusTone(tier: ReturnType<typeof qualityTier>): "good" | "medium" | "bad" {
+  if (tier === "good") return "good";
+  if (tier === "medium") return "medium";
+  return "bad";
 }
 
-export function TraceDetailView({ t }: { t: TraceDetail }) {
+function statusLabel(tier: ReturnType<typeof qualityTier>): string {
+  if (tier === "good") return "Likely grounded";
+  if (tier === "medium") return "Needs review";
+  return "High risk";
+}
+
+function bulletTone(v: number | null | undefined): "ok" | "warn" | "bad" {
+  if (v == null) return "warn";
+  if (v >= THRESHOLD_STRONG) return "ok";
+  if (v >= THRESHOLD_WEAK) return "warn";
+  return "bad";
+}
+
+function simMatchLabel(tier: QualityTier): string {
+  switch (tier) {
+    case "good":
+      return "strong match";
+    case "medium":
+      return "weak match";
+    default:
+      return "poor match";
+  }
+}
+
+function simChipClass(tier: QualityTier): string {
+  switch (tier) {
+    case "good":
+      return "tdv-chip-sim tdv-chip-sim--good";
+    case "medium":
+      return "tdv-chip-sim tdv-chip-sim--warn";
+    default:
+      return "tdv-chip-sim tdv-chip-sim--bad";
+  }
+}
+
+export function TraceDetailView({
+  t,
+  claimGraph,
+}: {
+  t: TraceDetail;
+  claimGraph: ClaimGraphPayload | null;
+}) {
   const tier = qualityTier(t);
   const failure = t.failure_type;
   const g = t.grounding_score;
@@ -55,291 +95,305 @@ export function TraceDetailView({ t }: { t: TraceDetail }) {
     (typeof meta.case_id === "string" && meta.case_id) ||
     null;
 
-  const heroClass =
-    tier === "good" ? "tdv-hero--good" : tier === "medium" ? "tdv-hero--medium" : "tdv-hero--bad";
-  const actionClass =
-    tier === "good"
-      ? "tdv-action--good"
-      : tier === "medium"
-        ? "tdv-action--medium"
-        : "tdv-action--bad";
-  const pillClass =
-    tier === "good" ? "tdv-pill--good" : tier === "medium" ? "tdv-pill--medium" : "tdv-pill--bad";
-
   const topSim = t.retrieved_docs?.[0]?.similarity_score ?? null;
   const simTier = topSim != null ? docSimilarityTier(topSim) : null;
+  const st = statusTone(tier);
+
+  const hybridBest =
+    parsed?.hybridBest != null ? parsed.hybridBest : g != null ? g : null;
+
+  const rel = t.reliability_score;
+  const relLabel = reliabilityLabel(rel);
 
   return (
     <div className="trace-debugger">
-      <nav className="tdv-breadcrumb">
-        <Link href="/traces">← Traces</Link>
-        <span className="trace-breadcrumb-sep"> / </span>
-        <span style={{ color: "#e5e7eb" }}>Detail</span>
-      </nav>
-      <h1 className="tdv-page-title">Trace decision</h1>
-
-      {shortAns ? (
-        <div className="tdv-caveat" role="note">
-          <strong>Short answer</strong> — sentence scores vs long passages can look low; treat as a
-          signal.
+      <header className="tdv-page-head">
+        <div className="tdv-page-head-titles">
+          <h1 className="tdv-page-title">Trace</h1>
+          <p className="tdv-page-sub">Run detail for one scored trace</p>
         </div>
-      ) : null}
-
-      {/* 1 — Hero verdict (full width, 3 columns on large screens) */}
-      <header className={`tdv-hero tdv-hero--shell ${heroClass}`}>
-        <div className="tdv-hero-col--lead">
-          <span className={`tdv-pill ${pillClass}`}>{verdictPillLabel(tier)}</span>
-          <p className="tdv-hero-lead">{heroOneLiner(tier, g, failure)}</p>
-        </div>
-        <div className="tdv-hero-metrics" aria-label="Key metrics">
-          <div className="tdv-hero-metric-block" title="Hybrid grounding score">
-            <span className="tdv-card-title">Grounding</span>
-            <span className="tdv-metric-value tdv-metric-value--teal">
-              {g != null ? g.toFixed(2) : "—"}
-            </span>
-            {g != null ? (
-              <span className="tdv-metric-sub">{groundingStrengthLabel(g)}</span>
-            ) : null}
-          </div>
-          <div className="tdv-hero-metric-block" title="Hallucination risk">
-            <span className="tdv-card-title">Risk</span>
-            <span className="tdv-metric-value tdv-metric-value--risk">
-              {t.hallucination_risk != null ? t.hallucination_risk.toFixed(2) : "—"}
-            </span>
-            {t.hallucination_risk != null ? (
-              <span className="tdv-metric-sub">{riskLabel(t.hallucination_risk)}</span>
-            ) : null}
-          </div>
-          <div className="tdv-hero-metric-block" title="Reliability composite">
-            <span className="tdv-card-title">Reliability</span>
-            <span className="tdv-metric-value tdv-metric-value--rel">
-              {t.reliability_score != null ? t.reliability_score.toFixed(2) : "—"}
-            </span>
-            {t.reliability_score != null ? (
-              <span className="tdv-metric-sub">{reliabilityLabel(t.reliability_score)}</span>
-            ) : null}
-          </div>
-        </div>
-        <div className="tdv-hero-col--action">
-          <div className={`tdv-action ${actionClass}`}>
-            <span className="tdv-action-k">Recommended action</span>
-            {recommendedAction(tier, failure)}
-          </div>
-        </div>
-        <div className="tdv-hero-meta-row">
-          <span>{t.model_name}</span>
-          <span>{t.latency_ms}ms total</span>
-          {experimentName ? <span>{experimentName}</span> : null}
-          <span>{t.created_at}</span>
+        <div className="tdv-page-meta" aria-label="Run metadata">
+          <span className="tdv-page-meta-item">{t.model_name}</span>
+          <span className="tdv-page-meta-item">{t.latency_ms}ms</span>
+          {experimentName ? <span className="tdv-page-meta-item">{experimentName}</span> : null}
+          <span className="tdv-page-meta-item tdv-page-meta-time">{t.created_at}</span>
         </div>
       </header>
 
-      {/* 2 — Main column + insights rail */}
-      <section className="tdv-analysis" aria-labelledby="why-heading">
-        <span className="tdv-kicker" id="why-heading" style={{ display: "block", marginBottom: "0.75rem" }}>
-          Why it scored this way
-        </span>
-        <div className="tdv-dashboard-grid">
-          <div className="tdv-dashboard-main">
-            <div className="tdv-why-copy tdv-card tdv-card--lift">
-              <span className="tdv-kicker">{whySectionTitle(tier)}</span>
-              <p className="tdv-why-p">{whyPara}</p>
-              <ul className="tdv-why-bullets">
-                <li>
-                  Best grounding score:{" "}
-                  <strong style={{ color: "#e5e7eb" }}>
-                    {parsed?.hybridBest != null ? parsed.hybridBest.toFixed(2) : g != null ? g.toFixed(2) : "—"}
-                  </strong>
-                </li>
-                <li>
-                  Sentence match:{" "}
-                  <strong style={{ color: "#e5e7eb" }}>
-                    {sentenceScore != null ? sentenceScore.toFixed(2) : "—"}
-                  </strong>
-                </li>
-                <li>
-                  Keyword overlap:{" "}
-                  <strong style={{ color: "#e5e7eb" }}>
-                    {keywordScore != null ? keywordScore.toFixed(2) : "—"}
-                  </strong>
-                </li>
-              </ul>
-              {t.explanation ? (
-                <details className="tdv-advanced">
-                  <summary>Full scorer narrative</summary>
-                  <ExplanationBody text={t.explanation} />
-                </details>
-              ) : null}
-            </div>
-
-            {/* 3 — Evidence */}
-            <section className="tdv-grid-cell">
-              <span className="tdv-kicker" style={{ display: "block", marginBottom: "0.5rem" }}>
-                Evidence
-              </span>
-              <TraceCollapsibleSection
-                className="tdv-card tdv-card--lift"
-                sectionKey="evidence"
-                traceId={t.trace_id}
-                title={
-                  <>
-                    Retrieved evidence
-                    {t.retrieved_docs?.length ? (
-                      <span style={{ fontWeight: 500, color: "#94a3b8" }}>
-                        {" "}
-                        ({t.retrieved_docs.length} document{t.retrieved_docs.length === 1 ? "" : "s"})
-                      </span>
-                    ) : null}
-                  </>
-                }
-                subtitle={
-                  topSim != null && simTier ? (
-                    <>
-                      Top similarity{" "}
-                      <span className="tdv-pill-sim">
-                        {topSim.toFixed(2)} {tierWord(simTier)}
-                      </span>
-                    </>
-                  ) : (
-                    "No documents"
-                  )
-                }
-              >
-          {t.retrieved_docs?.length ? (
-            t.retrieved_docs.map((d) => {
-              const sim = d.similarity_score;
-              const st = sim != null ? docSimilarityTier(sim) : null;
-              const excerpt = docExcerpt(d.content);
-              return (
-                <div key={d.doc_id} className="tdv-ev-card">
-                  <div className="tdv-ev-head">
-                    <strong style={{ fontSize: "0.88rem", wordBreak: "break-all" }}>{d.doc_id}</strong>
-                    {sim != null ? (
-                      <span className="tdv-pill-sim">
-                        {sim.toFixed(3)} {tierWord(st)}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="tdv-ev-excerpt">{highlightExcerpt(excerpt, t.response)}</p>
-                  <div className="tdv-ev-metrics">
-                    <span>Similarity {sim != null ? sim.toFixed(3) : "—"}</span>
-                    <span>
-                      Coverage {sim != null ? (sim >= THRESHOLD_STRONG ? "strong" : "partial") : "—"}
-                    </span>
-                  </div>
-                  <details style={{ marginTop: "0.65rem" }}>
-                    <summary style={{ cursor: "pointer", fontSize: "0.78rem", color: "#38bdf8" }}>
-                      Show full document
-                    </summary>
-                    <pre className="tdv-pre" style={{ marginTop: "0.5rem" }}>
-                      {d.content}
-                    </pre>
-                  </details>
-                </div>
-              );
-            })
-          ) : (
-            <p className="tdv-muted" style={{ margin: 0 }}>
-              No documents attached.
-            </p>
-          )}
-              </TraceCollapsibleSection>
-            </section>
-
-            {/* 4 — Prompt / response */}
-            <section className="tdv-grid-cell">
-              <span className="tdv-kicker" style={{ display: "block", marginBottom: "0.5rem" }}>
-                Prompt & response
-              </span>
-              <TraceCollapsibleSection
-                className="tdv-card tdv-card--lift"
-                sectionKey="prompt"
-                traceId={t.trace_id}
-                title="Question & model output"
-                subtitle="Side-by-side"
-              >
-          <div className="tdv-pr-grid">
-            <div className="tdv-pr-card">
-              <div className="tdv-pr-k">Question</div>
-              <pre className="tdv-pre">{t.prompt}</pre>
-            </div>
-            <div className="tdv-pr-card">
-              <div className="tdv-pr-k">Answer generated</div>
-              <pre className="tdv-pre">{t.response}</pre>
-              <p className="tdv-pr-note">{responseSupportNote(tier)}</p>
-            </div>
-          </div>
-              </TraceCollapsibleSection>
-            </section>
-          </div>
-
-          <aside className="tdv-dashboard-rail" aria-label="Grounding and execution insights">
-            {g != null ? (
-              <GroundingSpectrumVisual
-                score={g}
-                strongThreshold={THRESHOLD_STRONG}
-                weakThreshold={THRESHOLD_WEAK}
-              />
-            ) : null}
-            <ContributionBlendVisual
-              sentenceWeight={sentenceW}
-              keywordWeight={keywordW}
-              sentenceScore={sentenceScore}
-              keywordScore={keywordScore}
-            />
-            <ConfidenceSparklineVisual score={g} />
-            <FailureMixVisual trace={t} />
-            <ExecutionTimelineVisual segments={segments} totalMs={t.latency_ms} />
-          </aside>
+      {shortAns ? (
+        <div className="tdv-caveat-pro" role="note">
+          Short answers often score lower against long passages — treat sentence match as a signal only.
         </div>
+      ) : null}
+
+      {/* 1 — Status summary (decisive rail) */}
+      <section className={`tdv-status-rail tdv-status-rail--${st}`} aria-labelledby="status-heading">
+        <h2 id="status-heading" className="tdv-sr-only">
+          Status summary
+        </h2>
+        <div className="tdv-status-rail-main">
+          <div className="tdv-status-rail-badge">{statusLabel(tier)}</div>
+          <div className="tdv-status-reliability-row">
+            <span className="tdv-status-rel-label">Reliability</span>
+            <span className="tdv-status-rel-num">{rel != null ? rel.toFixed(2) : "—"}</span>
+            {rel != null ? (
+              <span className="tdv-status-rel-tag">({relLabel})</span>
+            ) : null}
+          </div>
+          <p className="tdv-status-interpret">{heroOneLiner(tier, g, failure)}</p>
+          <div className="tdv-status-rec-block">
+            <span className="tdv-status-rec-k">Recommendation</span>
+            <p className="tdv-status-rec-v">{recommendedAction(tier, failure)}</p>
+          </div>
+        </div>
+        <dl className="tdv-status-rail-side">
+          <div className="tdv-status-rail-kv">
+            <dt>Grounding</dt>
+            <dd>{g != null ? g.toFixed(2) : "—"}</dd>
+          </div>
+          <div className="tdv-status-rail-kv">
+            <dt>Hallucination risk</dt>
+            <dd>{t.hallucination_risk != null ? t.hallucination_risk.toFixed(2) : "—"}</dd>
+          </div>
+          <div className="tdv-status-rail-kv">
+            <dt>Model</dt>
+            <dd>{t.model_name}</dd>
+          </div>
+          <div className="tdv-status-rail-kv">
+            <dt>Runtime</dt>
+            <dd>{t.latency_ms}ms</dd>
+          </div>
+          {experimentName ? (
+            <div className="tdv-status-rail-kv">
+              <dt>Dataset / job</dt>
+              <dd>{experimentName}</dd>
+            </div>
+          ) : null}
+        </dl>
       </section>
 
-      {/* 6 — Debug */}
-      <section className="tdv-debug-band">
-        <span className="tdv-kicker" style={{ display: "block", marginBottom: "0.5rem" }}>
-          Debug
-        </span>
-        <TraceCollapsibleSection
-          sectionKey="debug"
-          traceId={t.trace_id}
-          title="Technical details"
-          subtitle="IDs, metadata, thresholds"
-        >
-          <p className="tdv-muted" style={{ fontSize: "0.78rem", marginTop: 0 }}>
-            Thresholds: weak &lt; {THRESHOLD_WEAK}, strong ≥ {THRESHOLD_STRONG}. Blend:{" "}
-            {shortAns ? "45% sentence / 55% keyword" : "70% sentence / 30% keyword"}.
+      <div className="tdv-flow-stack">
+        {/* 2 — Root cause (hero) */}
+        <section aria-labelledby="rc-heading">
+          <h2 className="tdv-section-h" id="rc-heading">
+            Root cause analysis
+          </h2>
+          <p className="tdv-section-sub">What failed the scoring gates and why it matters.</p>
+          <div className="tdv-rc-panel">
+            <p className="tdv-rc-lead">{whyPara}</p>
+            <h3 className="tdv-rc-subh">Problems detected</h3>
+            <ul className="tdv-rc-rows">
+              <li className="tdv-rc-row" data-tone={bulletTone(hybridBest)}>
+                <span className="tdv-rc-row-icon" aria-hidden>
+                  {bulletTone(hybridBest) === "ok" ? "✓" : "✕"}
+                </span>
+                <span className="tdv-rc-row-label">Hybrid grounding (best)</span>
+                <span className="tdv-rc-row-val">{hybridBest != null ? hybridBest.toFixed(2) : "—"}</span>
+                <span className="tdv-rc-row-hint">
+                  weak &lt; {THRESHOLD_WEAK}, strong ≥ {THRESHOLD_STRONG}
+                </span>
+              </li>
+              <li className="tdv-rc-row" data-tone={bulletTone(sentenceScore ?? undefined)}>
+                <span className="tdv-rc-row-icon" aria-hidden>
+                  {bulletTone(sentenceScore ?? undefined) === "ok" ? "✓" : "✕"}
+                </span>
+                <span className="tdv-rc-row-label">Sentence match</span>
+                <span className="tdv-rc-row-val">{sentenceScore != null ? sentenceScore.toFixed(2) : "—"}</span>
+                <span className="tdv-rc-row-hint" />
+              </li>
+              <li className="tdv-rc-row" data-tone={bulletTone(keywordScore ?? undefined)}>
+                <span className="tdv-rc-row-icon" aria-hidden>
+                  {bulletTone(keywordScore ?? undefined) === "ok" ? "✓" : "✕"}
+                </span>
+                <span className="tdv-rc-row-label">Keyword overlap</span>
+                <span className="tdv-rc-row-val">{keywordScore != null ? keywordScore.toFixed(2) : "—"}</span>
+                <span className="tdv-rc-row-hint" />
+              </li>
+            </ul>
+            <div className="tdv-rc-conclusion">
+              <span className="tdv-rc-conclusion-k">Conclusion</span>
+              <p className="tdv-rc-conclusion-p">{rootCauseConclusion(tier)}</p>
+            </div>
+            {t.explanation ? (
+              <details className="tdv-advanced tdv-advanced--rc">
+                <summary>Full scorer narrative</summary>
+                <ExplanationBody text={t.explanation} />
+              </details>
+            ) : null}
+          </div>
+        </section>
+
+        {/* 3 — Claim graph (supporting viz) */}
+        {claimGraph ? <ClaimGraphSection graph={claimGraph} /> : null}
+
+        {/* 4 — Evidence (log style) */}
+        <section aria-labelledby="ev-heading">
+          <h2 className="tdv-section-h" id="ev-heading">
+            Evidence
+          </h2>
+          <p className="tdv-section-sub tdv-ev-section-sub">
+            {t.retrieved_docs?.length
+              ? `${t.retrieved_docs.length} document${t.retrieved_docs.length === 1 ? "" : "s"}`
+              : "None"}
+            {topSim != null ? ` · top similarity ${topSim.toFixed(3)}` : ""}
+            {simTier ? ` · ${simMatchLabel(simTier)}` : ""}
           </p>
-          <p style={{ fontSize: "0.78rem", color: "#94a3b8", wordBreak: "break-all" }}>
-            <strong style={{ color: "#cbd5e1" }}>Trace ID</strong> {t.trace_id}
-          </p>
-          <p style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
-            <strong style={{ color: "#cbd5e1" }}>Agent</strong> {t.agent_name} · {t.environment}
-          </p>
-          {t.failure_type ? (
-            <p style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
-              <strong style={{ color: "#cbd5e1" }}>Failure type</strong> {t.failure_type}
+          <div className="tdv-ev-log">
+            {t.retrieved_docs?.length ? (
+              t.retrieved_docs.map((d) => {
+                const sim = d.similarity_score;
+                const tierDoc = sim != null ? docSimilarityTier(sim) : null;
+                const excerpt = docExcerpt(d.content);
+                return (
+                  <div key={d.doc_id} className="tdv-ev-log-row">
+                    <div className="tdv-ev-log-head">
+                      <code className="tdv-ev-log-id">{d.doc_id}</code>
+                      {sim != null && tierDoc ? (
+                        <span className={simChipClass(tierDoc)}>{sim.toFixed(3)}</span>
+                      ) : null}
+                    </div>
+                    <p className="tdv-ev-log-body">{highlightExcerpt(excerpt, t.response)}</p>
+                    <details className="tdv-ev-log-expand">
+                      <summary>Full passage</summary>
+                      <pre className="tdv-pre tdv-pre--passage">{d.content}</pre>
+                    </details>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="tdv-muted tdv-ev-empty">No retrieved documents on this trace.</p>
+            )}
+          </div>
+        </section>
+
+        {/* 5 — Input / output (debug) */}
+        <section aria-labelledby="io-heading">
+          <h2 className="tdv-section-h" id="io-heading">
+            Input / output
+          </h2>
+          <p className="tdv-section-sub">Request and model response — inspect like a log.</p>
+          <div className="tdv-io-split">
+            <div className="tdv-io-pane">
+              <div className="tdv-io-pane-k">Prompt</div>
+              <div className="tdv-io-pane-body">
+                <pre className="tdv-io-pre">{t.prompt}</pre>
+              </div>
+            </div>
+            <div className="tdv-io-pane">
+              <div className="tdv-io-pane-k">Model output</div>
+              <div className="tdv-io-pane-body">
+                <pre className="tdv-io-pre">{t.response}</pre>
+                <p className="tdv-io-note">{responseSupportNote(tier)}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 6 — Execution timeline */}
+        <section aria-labelledby="exec-heading">
+          <h2 className="tdv-section-h" id="exec-heading">
+            Execution timeline
+          </h2>
+          <p className="tdv-section-sub">Where time went for this run (from spans).</p>
+          <div className="tdv-exec-section">
+            <ExecutionTimelineVisual segments={segments} totalMs={t.latency_ms} />
+          </div>
+        </section>
+
+        {/* 7 — Signals (collapsed) */}
+        <section aria-labelledby="sig-heading">
+          <h2 className="tdv-section-h tdv-sr-only" id="sig-heading">
+            Signals
+          </h2>
+          <TraceCollapsibleSection
+            sectionKey="signals"
+            traceId={t.trace_id}
+            title="Signals"
+            subtitle="Grounding thresholds, blend composition, classification"
+            defaultOpen={false}
+          >
+            <div className="tdv-signals-grid">
+              {g != null ? (
+                <GroundingSpectrumVisual
+                  score={g}
+                  strongThreshold={THRESHOLD_STRONG}
+                  weakThreshold={THRESHOLD_WEAK}
+                />
+              ) : null}
+              <ContributionBlendVisual
+                sentenceWeight={sentenceW}
+                keywordWeight={keywordW}
+                sentenceScore={sentenceScore}
+                keywordScore={keywordScore}
+              />
+              <FailureMixVisual trace={t} />
+            </div>
+          </TraceCollapsibleSection>
+        </section>
+
+        {/* 8 — Technical details (collapsed) */}
+        <section className="tdv-debug-band" aria-labelledby="dbg-heading">
+          <h2 className="tdv-section-h tdv-sr-only" id="dbg-heading">
+            Technical details
+          </h2>
+          <TraceCollapsibleSection
+            sectionKey="debug"
+            traceId={t.trace_id}
+            title="Technical details"
+            subtitle="IDs, metadata, spans"
+            defaultOpen={false}
+          >
+            <p className="tdv-debug-note">
+              Scoring: weak &lt; {THRESHOLD_WEAK}, strong ≥ {THRESHOLD_STRONG}. Blend{" "}
+              {shortAns ? "45% / 55% sentence · keyword" : "70% / 30% sentence · keyword"}.
             </p>
-          ) : null}
-          {t.ingest_metadata && Object.keys(t.ingest_metadata).length > 0 ? (
-            <>
-              <div className="tdv-kicker" style={{ marginTop: "0.75rem" }}>
-                Run metadata (JSON)
+            <dl className="tdv-kv-list tdv-kv-list--tight">
+              <div className="tdv-kv-item">
+                <dt className="tdv-kv-dt">Trace ID</dt>
+                <dd className="tdv-kv-dd">
+                  <code className="tdv-code-inline tdv-code-id">{t.trace_id}</code>
+                </dd>
               </div>
-              <pre className="tdv-debug-pre">{JSON.stringify(t.ingest_metadata, null, 2)}</pre>
-            </>
-          ) : null}
-          {t.spans && t.spans.length > 0 ? (
-            <>
-              <div className="tdv-kicker" style={{ marginTop: "0.75rem" }}>
-                Raw spans
+              <div className="tdv-kv-item">
+                <dt className="tdv-kv-dt">Agent</dt>
+                <dd className="tdv-kv-dd">
+                  <code className="tdv-code-inline tdv-code-id">
+                    {t.agent_name} · {t.environment}
+                  </code>
+                </dd>
               </div>
-              <pre className="tdv-debug-pre">
-                {JSON.stringify(t.spans, null, 2)}
-              </pre>
-            </>
-          ) : null}
-        </TraceCollapsibleSection>
-      </section>
+              {t.failure_type ? (
+                <div className="tdv-kv-item">
+                  <dt className="tdv-kv-dt">Failure type</dt>
+                  <dd className="tdv-kv-dd">
+                    <code className="tdv-code-inline">{t.failure_type}</code>
+                  </dd>
+                </div>
+              ) : null}
+              {t.failure_reason ? (
+                <div className="tdv-kv-item">
+                  <dt className="tdv-kv-dt">Root cause (v1)</dt>
+                  <dd className="tdv-kv-dd">
+                    <code className="tdv-code-inline">{t.failure_reason}</code>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+            {t.ingest_metadata && Object.keys(t.ingest_metadata).length > 0 ? (
+              <>
+                <h3 className="tdv-subpanel-title">Run metadata</h3>
+                <TraceMetadataKvList data={t.ingest_metadata} />
+              </>
+            ) : null}
+            {t.spans && t.spans.length > 0 ? (
+              <>
+                <h3 className="tdv-subpanel-title">Spans (raw)</h3>
+                <pre className="tdv-json-block tdv-json-block--scroll">{JSON.stringify(t.spans, null, 2)}</pre>
+              </>
+            ) : null}
+          </TraceCollapsibleSection>
+        </section>
+      </div>
     </div>
   );
 }

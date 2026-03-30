@@ -15,7 +15,13 @@ const centerLinks = [
 
 export function LandingNav() {
   const pathname = usePathname() ?? "";
-  const onDashboard = pathname.startsWith("/traces") || pathname.startsWith("/overview");
+  const onDashboard =
+    pathname === "/overview" ||
+    pathname.startsWith("/traces") ||
+    pathname.startsWith("/data") ||
+    pathname === "/lab" ||
+    pathname.startsWith("/lab/");
+  const onDocs = pathname.startsWith("/docs");
 
   return (
     <header className="ld-nav">
@@ -45,13 +51,17 @@ export function LandingNav() {
         </nav>
         <div className="ld-nav-right">
           <Link
-            href="/traces"
+            href="/overview"
             className={`ld-btn ld-btn--ghost ld-btn--sm${onDashboard ? " ld-btn--active" : ""}`}
             aria-current={onDashboard ? "page" : undefined}
           >
             Dashboard
           </Link>
-          <Link href="/docs" className="ld-btn ld-btn--primary ld-btn--sm">
+          <Link
+            href="/docs"
+            className={`ld-btn ld-btn--primary ld-btn--sm${onDocs ? " ld-btn--active" : ""}`}
+            aria-current={onDocs ? "page" : undefined}
+          >
             Read docs
           </Link>
         </div>

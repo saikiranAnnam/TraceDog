@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 
-function apiBase(): string {
-  return (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
-}
+import { resolveApiOrigin } from "@/lib/api";
 
 export async function GET(
   req: Request,
@@ -15,12 +13,9 @@ export async function GET(
       { status: 401 },
     );
   }
-  const base = apiBase();
-  if (!base) {
-    return NextResponse.json({ detail: "NEXT_PUBLIC_API_URL is not set" }, { status: 500 });
-  }
+  const origin = resolveApiOrigin();
   const jobId = encodeURIComponent(params.jobId);
-  const res = await fetch(`${base}/api/v1/admin/experiments/jobs/${jobId}`, {
+  const res = await fetch(`${origin}/api/v1/admin/experiments/jobs/${jobId}`, {
     headers: { Authorization: auth },
   });
   const body = await res.json().catch(() => ({}));
