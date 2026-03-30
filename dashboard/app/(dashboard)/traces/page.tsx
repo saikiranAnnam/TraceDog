@@ -12,10 +12,10 @@ export default async function TracesPage() {
 
   if (err) {
     return (
-      <div className="td-traces-page">
-        <h1 className="td-traces-title">Traces</h1>
-        <p style={{ color: "#fb7185" }}>{err}</p>
-        <p className="td-traces-sub">
+      <div className="trace-debugger td-traces-page">
+        <h1 className="tdv-page-title">Traces</h1>
+        <p className="td-traces-error">{err}</p>
+        <p className="tdv-section-sub td-traces-hero-sub">
           Start API: <code>docker compose -f infra/docker-compose.yml up</code> or{" "}
           <code>uvicorn</code> with Postgres. Set <code>NEXT_PUBLIC_API_URL</code> if needed.
         </p>

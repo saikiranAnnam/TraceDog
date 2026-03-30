@@ -98,3 +98,14 @@ export function responseSupportNote(tier: QualityTier): string {
   if (tier === "medium") return "Mixed support — verify claims against sources.";
   return "Elevated risk — treat output as unverified.";
 }
+
+/** One-line conclusion for the root-cause panel (operational, not marketing). */
+export function rootCauseConclusion(tier: QualityTier): string {
+  if (tier === "good") {
+    return "Retrieved evidence supports the generated answer at an acceptable strength for this trace.";
+  }
+  if (tier === "medium") {
+    return "Retrieved evidence does not fully support the generated answer — review claims against sources before shipping.";
+  }
+  return "Retrieved evidence is insufficient, weak, or in conflict with the generated answer.";
+}

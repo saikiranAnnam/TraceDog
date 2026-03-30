@@ -90,6 +90,29 @@ jobs:
           NEXT_PUBLIC_API_URL: http://localhost:8000
         run: npm run build
 
+  eval-hf-pins:
+    name: Evaluation (HF dataset revision pins)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install eval dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r evaluation/requirements.txt
+
+      - name: Verify pinned HF revisions load
+        env:
+          PYTHONPATH: .
+          TOKENIZERS_PARALLELISM: "false"
+          OMP_NUM_THREADS: "1"
+        run: python evaluation/scripts/verify_hf_dataset_revisions.py
+
   docker-backend:
     name: Docker (API image)
     runs-on: ubuntu-latest

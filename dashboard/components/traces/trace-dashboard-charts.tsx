@@ -43,13 +43,13 @@ export function ReliabilityLineChart({
     >
       <defs>
         <linearGradient id="td-rel-line" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.02" />
+          <stop offset="0%" stopColor="var(--tdv-accent-line, rgba(96,165,250,0.62))" stopOpacity="0.38" />
+          <stop offset="100%" stopColor="var(--tdv-accent-line, rgba(96,165,250,0.62))" stopOpacity="0.02" />
         </linearGradient>
       </defs>
       <polyline
         fill="none"
-        stroke="#22d3ee"
+        stroke="var(--tdv-accent-line, rgba(96,165,250,0.7))"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -139,24 +139,30 @@ export function SuccessDonutChart({
   const cy = 64;
   const start = -Math.PI / 2;
   const okEnd = start + okFrac * Math.PI * 2;
+  const okFill = "rgba(34,197,94,0.62)";
+  const okStroke = "rgba(34,197,94,0.22)";
+  const badFill = "rgba(244,114,182,0.55)";
+  const badStroke = "rgba(244,114,182,0.2)";
   const pathOk =
     okFrac >= 1
-      ? <circle cx={cx} cy={cy} r={r} fill="#22c55e" opacity={0.9} />
+      ? <circle cx={cx} cy={cy} r={r} fill={okFill} stroke={okStroke} strokeWidth={1} />
       : okFrac <= 0
         ? null
         : (
             <path
               d={donutArc(cx, cy, r, start, okEnd)}
-              fill="#22c55e"
-              opacity={0.92}
+              fill={okFill}
+              stroke={okStroke}
+              strokeWidth={0.8}
             />
           );
   const pathBad =
     okFrac < 1 && bad > 0 ? (
       <path
         d={donutArc(cx, cy, r, okEnd, start + Math.PI * 2)}
-        fill="#fb7185"
-        opacity={0.85}
+        fill={badFill}
+        stroke={badStroke}
+        strokeWidth={0.8}
       />
     ) : null;
   const pct = Math.round(okFrac * 100);
@@ -165,10 +171,17 @@ export function SuccessDonutChart({
       <svg viewBox="0 0 128 128" width={140} height={140} role="img" aria-label="Success vs failure">
         {pathOk}
         {pathBad}
-        <text x={cx} y={cy - 4} textAnchor="middle" fill="#e2e8f0" fontSize="18" fontWeight="700">
+        <text
+          x={cx}
+          y={cy - 4}
+          textAnchor="middle"
+          fill="var(--tdv-text, #e6e6e6)"
+          fontSize="18"
+          fontWeight="700"
+        >
           {pct}%
         </text>
-        <text x={cx} y={cy + 14} textAnchor="middle" fill="#94a3b8" fontSize="11">
+        <text x={cx} y={cy + 14} textAnchor="middle" fill="var(--tdv-muted, #9a9aa0)" fontSize="11">
           healthy
         </text>
       </svg>
@@ -220,14 +233,14 @@ export function QualityLatencyScatter({
         return (
           <g key={i}>
             <title>{`${p.label}: reliability ${p.y.toFixed(2)}, latency ${p.x}ms`}</title>
-            <circle cx={px} cy={py} r={9} fill={p.color} opacity={0.9} />
+            <circle cx={px} cy={py} r={9} fill={p.color} opacity={0.58} stroke="rgba(255,255,255,0.12)" strokeWidth={0.75} />
           </g>
         );
       })}
-      <text x={pad} y={h - 8} fill="#64748b" fontSize="10">
+      <text x={pad} y={h - 8} fill="var(--tdv-muted, #9a9aa0)" fontSize="10">
         Latency →
       </text>
-      <text x={8} y={pad} fill="#64748b" fontSize="10" transform={`rotate(-90 8 ${pad})`}>
+      <text x={8} y={pad} fill="var(--tdv-muted, #9a9aa0)" fontSize="10" transform={`rotate(-90 8 ${pad})`}>
         Reliability →
       </text>
     </svg>
@@ -281,6 +294,7 @@ export function ModelTrendLines({
             key={s.model}
             fill="none"
             stroke={color}
+            strokeOpacity={0.78}
             strokeWidth="2.2"
             strokeLinecap="round"
             strokeLinejoin="round"
