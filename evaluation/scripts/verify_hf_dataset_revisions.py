@@ -13,8 +13,16 @@ Usage (repo root)::
 
 from __future__ import annotations
 
+import gc
+import os
 import sys
 from pathlib import Path
+
+# Before Hugging Face / Arrow / tokenizers load: avoids rare native abort() on exit in CI
+# ("terminate called without an active exception" / core dump after successful OK lines).
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
@@ -50,12 +58,19 @@ def main() -> int:
             else:
                 ds = load_dataset(name, split=split, streaming=True, revision=rev)
             _ = next(iter(ds))
+            del ds
+            gc.collect()
         except Exception as e:
             print(f"FAIL {label}\n  {e}", file=sys.stderr)
             ok = False
         else:
             print(f"OK   {label} split={split}")
-    return 0 if ok else 1
+    code = 0 if ok else 1
+    gc.collect()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    # Bypass flaky C++ teardown in pyarrow/datasets (abort after successful run in some CI envs).
+    os._exit(code)
 
 
 if __name__ == "__main__":

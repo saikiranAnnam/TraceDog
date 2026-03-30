@@ -109,6 +109,8 @@ jobs:
       - name: Verify pinned HF revisions load
         env:
           PYTHONPATH: .
+          TOKENIZERS_PARALLELISM: "false"
+          OMP_NUM_THREADS: "1"
         run: python evaluation/scripts/verify_hf_dataset_revisions.py
 
   docker-backend:
