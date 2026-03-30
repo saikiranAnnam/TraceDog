@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """
-SQuAD v2 → LLM → TraceDog.
+HotpotQA → LLM → TraceDog (CGGE on multi-hop evidence).
 
 Usage (from repo root):
-  cp evaluation/.env.example evaluation/.env   # add keys + models
-  PYTHONPATH=. python -m evaluation.runners.run_squad_eval --limit 10
+  pip install -r evaluation/requirements.txt
+  cp evaluation/.env.example evaluation/.env   # keys + TRACEDOG_URL
+  PYTHONPATH=. python -m evaluation.runners.run_hotpot_eval --limit 10
+
+Data:
+  • Default: Hugging Face `hotpot_qa` / `fullwiki` (downloads on first run).
+  • Optional: `--json-path data/hotpot/hotpot_dev_fullwiki_v1.json` (official array JSON).
 
 Loads env from repo `.env` then `evaluation/.env` (latter overrides).
 """
@@ -39,7 +44,6 @@ def _normalize_provider(raw: str | None) -> str:
     return p if p in ("openai", "anthropic") else "openai"
 
 
-# Anthropic returns 404 for retired snapshot ids still common in old .env files.
 _RETIRED_ANTHROPIC_MODELS: dict[str, str] = {
     "claude-3-5-haiku-20241022": "claude-haiku-4-5",
     "claude-3-5-sonnet-20241022": "claude-sonnet-4-6",
@@ -59,18 +63,40 @@ def _resolve_anthropic_model_id(model_name: str) -> str:
     return m
 
 
+def _attribution_recall(
+    gold_doc_ids: list[str],
+    claim_best_docs: list[str | None],
+) -> float | None:
+    gold = {g for g in gold_doc_ids if g}
+    if not gold:
+        return None
+    pred = {d for d in claim_best_docs if d}
+    return len(gold & pred) / len(gold)
+
+
 def main() -> None:
     _load_eval_env()
 
-    p = argparse.ArgumentParser(description="Run SQuAD v2 through an LLM and TraceDog")
-    p.add_argument("--split", default="validation", choices=("train", "validation"))
+    p = argparse.ArgumentParser(description="Run HotpotQA through an LLM and TraceDog (CGGE)")
+    p.add_argument(
+        "--split",
+        default="validation",
+        choices=("train", "validation", "test"),
+        help="Hugging Face split (ignored if --json-path is set)",
+    )
     p.add_argument("--offset", type=int, default=0)
     p.add_argument("--limit", type=int, default=10)
+    p.add_argument(
+        "--json-path",
+        type=Path,
+        default=None,
+        help="Optional path to official hotpot_*.json (array of examples)",
+    )
     p.add_argument(
         "--provider",
         default=None,
         choices=("openai", "anthropic"),
-        help="LLM API; default EVAL_LLM_PROVIDER or openai (see evaluation/.env.example)",
+        help="LLM API; default EVAL_LLM_PROVIDER or openai",
     )
     p.add_argument(
         "--model",
@@ -81,8 +107,8 @@ def main() -> None:
         "--tracedog-url",
         default=os.environ.get("TRACEDOG_URL", "http://localhost:8000"),
     )
-    p.add_argument("--experiment", default="squad-v2-eval")
-    p.add_argument("--agent-name", default="squad-eval-runner")
+    p.add_argument("--experiment", default="hotpot-eval")
+    p.add_argument("--agent-name", default="hotpot-eval-runner")
     p.add_argument("--environment", default="evaluation")
     p.add_argument("--dry-run", action="store_true", help="Do not POST to TraceDog")
     p.add_argument(
@@ -94,7 +120,7 @@ def main() -> None:
     p.add_argument(
         "--summary",
         action="store_true",
-        help="After the run, print aggregate chunk + CGGE + hybrid metrics (requires successful TraceDog POSTs).",
+        help="Print aggregate chunk + CGGE + hybrid metrics (and optional gold attribution recall).",
     )
     p.add_argument(
         "--write-summary-json",
@@ -115,34 +141,24 @@ def main() -> None:
     )
     args = p.parse_args()
 
-    from evaluation.runners.adapters.squad_adapter import (
+    from evaluation.runners.adapters.hotpot_adapter import (
         docs_for_tracedog_payload,
-        squad_row_to_eval_case,
+        hotpot_row_to_eval_case,
     )
     from evaluation.runners.utils.prompt_builder import build_prompt
 
     default_models = {
         "openai": "gpt-4o-mini",
-        # Anthropic retires dated snapshots; alias tracks current Haiku 4.5
         "anthropic": "claude-haiku-4-5",
     }
     provider = _normalize_provider(args.provider or os.environ.get("EVAL_LLM_PROVIDER"))
-    model_env = (
-        "EVAL_OPENAI_MODEL" if provider == "openai" else "EVAL_ANTHROPIC_MODEL"
-    )
-    model_name = (
-        args.model
-        or os.environ.get(model_env)
-        or default_models[provider]
-    )
+    model_env = "EVAL_OPENAI_MODEL" if provider == "openai" else "EVAL_ANTHROPIC_MODEL"
+    model_name = args.model or os.environ.get(model_env) or default_models[provider]
     model_name = model_name.strip()
     if provider == "anthropic":
         model_name = _resolve_anthropic_model_id(model_name)
 
-    env_keys = {
-        "openai": "OPENAI_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-    }
+    env_keys = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
     api_key = (os.environ.get(env_keys[provider]) or "").strip() or None
     if not args.dry_run and not api_key:
         print(
@@ -173,7 +189,7 @@ def main() -> None:
         try:
             rows = load_materialized_rows(args.materialized)
         except (ValueError, OSError) as e:
-            print(f"[squad] materialized load failed: {e}", file=sys.stderr)
+            print(f"[hotpot] materialized load failed: {e}", file=sys.stderr)
             sys.exit(1)
         source_descriptor = enriched_descriptor_for_materialized(
             args.materialized, rows
@@ -187,7 +203,7 @@ def main() -> None:
         pipeline_stats = stats_obj.as_dict()
         emit_source_fetch_complete(
             run_id=run_rid,
-            registry_id="squad_v2",
+            registry_id="hotpot_qa_fullwiki",
             stats=stats_obj,
             descriptor=source_descriptor,
             offset=0,
@@ -195,13 +211,13 @@ def main() -> None:
             load_mode="materialized_jsonl",
         )
     else:
-        from evaluation.sources import SquadV2RowSource
+        from evaluation.sources import HotpotQARowSource
 
-        source = SquadV2RowSource(split=args.split)
+        source = HotpotQARowSource(split=args.split, json_path=args.json_path)
         try:
             fr = fetch_rows_pipeline(
                 source,
-                registry_id="squad_v2",
+                registry_id="hotpot_qa_fullwiki",
                 offset=args.offset,
                 limit=args.limit,
                 use_cache=use_source_cache,
@@ -211,22 +227,30 @@ def main() -> None:
                 run_id=run_rid,
             )
         except Exception as e:
-            print(f"[squad] failed to load data: {e}", file=sys.stderr)
+            print(f"[hotpot] failed to load data: {e}", file=sys.stderr)
+            err = str(e).lower()
+            if "dataclass" in err:
+                print(
+                    "[hotpot] Fix: upgrade Hugging Face datasets (3.x breaks Hotpot schema parsing): "
+                    "pip install -U 'datasets>=4.0'",
+                    file=sys.stderr,
+                )
             sys.exit(1)
         rows = fr.rows
         source_descriptor = fr.descriptor
         pipeline_stats = fr.stats.as_dict()
-        log_pipeline_stats(fr.stats, registry_id="squad_v2")
+        log_pipeline_stats(fr.stats, registry_id="hotpot_qa_fullwiki")
 
-    split_for_meta = (
-        source_descriptor.split
-        if args.materialized
-        else args.split
-    )
+    if args.materialized:
+        split_for_meta = source_descriptor.split or "materialized"
+    elif args.json_path:
+        split_for_meta = "json_file"
+    else:
+        split_for_meta = args.split
 
     lineage_frag = collect_lineage(
-        runner_name="run_squad_eval",
-        adapter_id="squad_adapter",
+        runner_name="run_hotpot_eval",
+        adapter_id="hotpot_adapter",
         llm_model=model_name,
         llm_provider=provider,
         source_descriptor=source_descriptor,
@@ -254,26 +278,28 @@ def main() -> None:
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
     cgge_rows: list[dict[str, Any]] = []
+    recall_vals: list[float] = []
 
     for i, row in enumerate(rows):
         if (i + 1) % max(1, len(rows) // 5 or 1) == 0 or i == 0:
-            print(f"[squad_v2] {i + 1}/{len(rows)}", file=sys.stderr)
-        case = squad_row_to_eval_case(row)
+            print(f"[hotpot_qa] {i + 1}/{len(rows)}", file=sys.stderr)
+        case = hotpot_row_to_eval_case(row)
         prompt = build_prompt(case.question, case.retrieved_docs)
         payload_docs = docs_for_tracedog_payload(case.retrieved_docs)
 
         meta = {
             "run_type": "evaluation",
             "task_type": "short_answer_qa",
-            "dataset_name": "squad_v2",
+            "dataset_name": "hotpot_qa",
             "split": split_for_meta,
             "case_id": case.case_id,
             "experiment_name": args.experiment,
             "llm_provider": provider,
             "eval_question": case.question,
-            "is_answerable": case.is_answerable,
             "reference_answer": case.reference_answer,
-            "title": case.title,
+            "gold_supporting_doc_ids": case.gold_supporting_doc_ids,
+            "question_type": case.question_type,
+            "level": case.level,
             "eval_lineage": lineage_frag,
         }
 
@@ -298,7 +324,7 @@ def main() -> None:
             record["response_preview"] = result.response_text[:200]
 
         if args.dry_run or not result:
-            print(f"[dry-run] {case.case_id} prompt_chars={len(prompt)}", file=sys.stderr)
+            print(f"[dry-run] {case.case_id} prompt_chars={len(prompt)} docs={len(payload_docs)}", file=sys.stderr)
         else:
             from evaluation.runners.utils.tracedog_client import submit_trace
 
@@ -316,24 +342,33 @@ def main() -> None:
                 )
             except requests.exceptions.ConnectionError:
                 print(
-                    f"\n[squad] TraceDog API is not reachable at {args.tracedog_url!r} "
+                    f"\n[hotpot] TraceDog API is not reachable at {args.tracedog_url!r} "
                     "(connection refused — nothing listening).\n"
-                    "  • Start the backend: cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000\n"
-                    "  • Or set TRACEDOG_URL / --tracedog-url to your API.\n"
-                    "  • Or use --dry-run to skip POST (still runs the LLM if keys are set).\n",
+                    "  • Start the backend, e.g. from repo root:\n"
+                    "      cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000\n"
+                    "    or: docker compose -f infra/docker-compose.yml up (if you use that stack)\n"
+                    "  • Or point to a running API: TRACEDOG_URL=https://... or --tracedog-url ...\n"
+                    "  • Or run without ingest (LLM only, no CGGE in TraceDog): add --dry-run\n",
                     file=sys.stderr,
                 )
                 sys.exit(1)
             from evaluation.runners.utils.trace_metrics import extract_tracedog_metrics
 
-            m = extract_tracedog_metrics(td)
-            record.update(m)
-            cgge_rows.append(m)
             cg = td.get("claim_grounding") or {}
             claims = cg.get("claims") or []
+            best_docs = [c.get("best_doc_id") for c in claims if isinstance(c, dict)]
+            rec = _attribution_recall(case.gold_supporting_doc_ids, best_docs)
+            if rec is not None:
+                recall_vals.append(rec)
+            m = extract_tracedog_metrics(td)
+            record.update(m)
+            record["gold_supporting_doc_ids"] = case.gold_supporting_doc_ids
+            record["cgge_best_doc_ids"] = [d for d in best_docs if d]
+            record["attribution_recall_vs_gold"] = rec
+            cgge_rows.append(m)
+            rec_s = f" attr_recall={rec:.2f}" if rec is not None else ""
             hy_h = m.get("hybrid_answer_hallucination")
-            hy_t = m.get("hybrid_trace_reliability")
-            hy_s = f"\thybrid_h={hy_h}\thybrid_rel={hy_t}" if hy_h is not None else ""
+            hy_s = f"\thybrid_h={hy_h}" if hy_h is not None else ""
             sev = (td.get("incident") or {}).get("level")
             if not sev and isinstance(td.get("reliability_insights"), dict):
                 sev = (td["reliability_insights"].get("incident") or {}).get("level")
@@ -341,8 +376,7 @@ def main() -> None:
             print(
                 f"{case.case_id}\t{result.model_name}\trel={td.get('reliability_score')}\t"
                 f"risk={td.get('hallucination_risk')}\tft={td.get('failure_type')}\t"
-                f"cgge_u={cg.get('unsupported_ratio')}\tfr={td.get('failure_reason')!r}"
-                f"{hy_s}{sev_s}",
+                f"cgge_u={cg.get('unsupported_ratio')}\tclaims={len(claims)}{rec_s}{hy_s}{sev_s}",
                 file=sys.stderr,
             )
 
@@ -354,16 +388,19 @@ def main() -> None:
         from evaluation.runners.utils.trace_metrics import aggregate_eval_rows, format_summary_line
 
         agg = aggregate_eval_rows(cgge_rows)
-        print(format_summary_line("squad_v2 summary", agg), file=sys.stderr)
+        extra = ""
+        if recall_vals:
+            extra = f"  avg_attribution_recall_vs_gold={sum(recall_vals) / len(recall_vals):.3f}"
+        print(format_summary_line("hotpot_qa summary", agg, extra_suffix=extra), file=sys.stderr)
         if args.write_summary_json:
             args.write_summary_json.parent.mkdir(parents=True, exist_ok=True)
-            args.write_summary_json.write_text(
-                json.dumps({"experiment": args.experiment, "aggregate": agg}, indent=2),
-                encoding="utf-8",
-            )
-            print(f"[squad_v2] wrote {args.write_summary_json}", file=sys.stderr)
+            payload = {"experiment": args.experiment, "aggregate": agg}
+            if recall_vals:
+                payload["avg_attribution_recall_vs_gold"] = sum(recall_vals) / len(recall_vals)
+            args.write_summary_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            print(f"[hotpot_qa] wrote {args.write_summary_json}", file=sys.stderr)
     elif args.summary and not cgge_rows:
-        print("\n[squad_v2 summary] no TraceDog rows (dry-run or all LLM errors?)", file=sys.stderr)
+        print("\n[hotpot_qa summary] no TraceDog rows (dry-run or all LLM errors?)", file=sys.stderr)
 
 
 if __name__ == "__main__":
