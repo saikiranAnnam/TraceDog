@@ -1,3 +1,5 @@
+# API image is built from the sibling repo **TraceDog-backend** (clone next to this repo),
+# or run the API locally from that repository. Adjust `context` if your path differs.
 services:
   postgres:
     image: postgres:16-alpine
@@ -17,7 +19,7 @@ services:
 
   api:
     build:
-      context: ../backend
+      context: ../TraceDog-backend
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql+psycopg://tracedog:tracedog@postgres:5432/tracedog

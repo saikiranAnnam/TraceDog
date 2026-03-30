@@ -130,7 +130,7 @@ export function AdminDataPipelineRunner() {
         typeof body.detail === "string" ? body.detail : `Enqueue failed (${res.status})`;
       if (res.status === 404) {
         setError(
-          `${detail} — Restart/rebuild the API from this repo (route must exist), set NEXT_PUBLIC_API_URL to the same host:port your traces use (origin only, no /api/v1). Verify with: curl -sS ORIGIN/api/v1/admin/data-pipeline/jobs (expect JSON with "scripts"); if that 404s, the dashboard is not talking to your current backend process.`,
+          `${detail} — Restart/rebuild the API (TraceDog-backend repo; route must exist), set NEXT_PUBLIC_API_URL to the same host:port your traces use (origin only, no /api/v1). Verify with: curl -sS ORIGIN/api/v1/admin/data-pipeline/jobs (expect JSON with "scripts"); if that 404s, the dashboard is not talking to your current API process.`,
         );
       } else {
         setError(detail);
