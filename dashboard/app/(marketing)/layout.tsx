@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "../landing-premium.css";
 import { LandingNav } from "@/components/landing/premium/landing-nav";
+import { ProductPreviewBanner } from "@/components/product-preview-banner";
 import { marketingMono, marketingSans } from "@/lib/marketing-fonts";
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export default function MarketingLayout({
     <div
       className={`ld-root ${marketingSans.variable} ${marketingMono.variable}`}
     >
+      <ProductPreviewBanner />
       <LandingNav />
       {children}
     </div>

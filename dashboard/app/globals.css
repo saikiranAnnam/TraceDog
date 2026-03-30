@@ -4414,6 +4414,51 @@ a:hover {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* In-progress banner (dashboard + docs) */
+.td-product-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 0.55rem 1rem 0.6rem;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.22);
+  background: linear-gradient(
+    180deg,
+    rgba(99, 102, 241, 0.12) 0%,
+    rgba(15, 23, 42, 0.92) 100%
+  );
+}
+
+.td-product-banner-icon {
+  flex-shrink: 0;
+  margin-top: 0.12rem;
+  color: #a5b4fc;
+}
+
+.td-product-banner-text {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #c7d2fe;
+}
+
+.td-product-banner-text strong {
+  font-weight: 650;
+  color: #e0e7ff;
+}
+
+@media (max-width: 520px) {
+  .td-product-banner {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .td-product-banner-text {
+    font-size: 0.74rem;
+  }
+}
+
 /* Dashboard shell: optional marketing top nav (same strip as marketing home) */
 .app-shell-root {
   display: flex;

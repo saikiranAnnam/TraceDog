@@ -98,8 +98,8 @@ export function ModelComparisonPanel({
       <div className="td-model-charts">
         <div className="td-chart-card">
           <div className="td-chart-head">
-            <h3 className="tdv-section-h">Reliability trend by model</h3>
-            <p className="tdv-section-sub td-chart-head-desc">Each line is one model’s reliability over time.</p>
+          <h3 className="tdv-section-h">Reliability trend by model</h3>
+          <p className="tdv-section-sub td-chart-head-desc">Each line is one model’s reliability over time.</p>
           </div>
           <ModelTrendLines seriesByModel={trendSeries} palette={MODEL_PALETTE} />
           <div className="td-model-legend">

@@ -23,6 +23,7 @@ import {
 import { BrandLogo } from "@/components/brand-logo";
 import { DashboardBreadcrumb } from "@/components/dashboard/dashboard-breadcrumb";
 import { LandingNav } from "@/components/landing/premium/landing-nav";
+import { ProductPreviewBanner } from "@/components/product-preview-banner";
 import { SITE } from "@/lib/site";
 
 type NavItem = {
@@ -124,6 +125,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-shell-root">
+      {showMarketingTopNav ? <ProductPreviewBanner /> : null}
       {showMarketingTopNav ? (
         <div className="app-shell-marketing-nav">
           <LandingNav />

@@ -77,7 +77,7 @@ export function ExperimentsRepairLlmLive() {
         Same flow as <code className="docs-inline-code">pytest tests/integration/test_repair_llm_live.py</code>{" "}
         (policy preset). <strong>HotpotQA</strong> uses one bundled multi-hop row (same shape as{" "}
         <code className="docs-inline-code">run_hotpot_eval</code>). OpenAI runs on the <strong>API server</strong>, which must have{" "}
-        <code className="docs-inline-code">OPENAI_API_KEY</code> in <code className="docs-inline-code">backend/.env</code>{" "}
+        <code className="docs-inline-code">OPENAI_API_KEY</code> on the API host (e.g. <code className="docs-inline-code">.env</code> in <strong>TraceDog-backend</strong>){" "}
         (not in the browser). Uses <code className="docs-inline-code">ADMIN_API_KEY</code> here. Creates a real{" "}
         <code className="docs-inline-code">trace_id</code> in the API database and may incur OpenAI cost.
       </p>
