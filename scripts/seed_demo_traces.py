@@ -159,6 +159,50 @@ _DEMOS: list[dict] = [
         ],
         "ingest_metadata": {"experiment": "recruiter-demo-v1", "case_id": "space-4"},
     },
+    # Portfolio: CGGE graph — one claim strongly supported, one risky / conflicted vs evidence
+    {
+        "agent_name": "eval-bot",
+        "environment": "demo",
+        "prompt": "How does DynamoDB scale?",
+        "response": (
+            "DynamoDB scales to millions of requests and guarantees zero latency."
+        ),
+        "model_name": "gpt-4o-mini",
+        "latency_ms": 640,
+        "retrieved_docs": [
+            {
+                "doc_id": "aws-scale",
+                "content": (
+                    "DynamoDB is designed to scale horizontally and supports "
+                    "millions of requests per second."
+                ),
+            },
+            {
+                "doc_id": "aws-latency",
+                "content": (
+                    "DynamoDB offers low-latency performance, though actual latency "
+                    "depends on workload and network conditions."
+                ),
+            },
+        ],
+        "ingest_metadata": {"experiment": "portfolio-v1", "case_id": "cgge-partial-hallucination"},
+    },
+    # Portfolio: trivial fully-grounded answer (good case for graph + metrics)
+    {
+        "agent_name": "eval-bot",
+        "environment": "demo",
+        "prompt": "What is two plus two?",
+        "response": "Two plus two equals four.",
+        "model_name": "claude-haiku",
+        "latency_ms": 210,
+        "retrieved_docs": [
+            {
+                "doc_id": "math-facts",
+                "content": "Basic arithmetic: 2 + 2 = 4.",
+            }
+        ],
+        "ingest_metadata": {"experiment": "portfolio-v1", "case_id": "cgge-all-supported"},
+    },
 ]
 
 
