@@ -1,4 +1,4 @@
-# TraceDog CI — backend tests, dashboard build, Docker validation
+# TraceDog CI — dashboard build, evaluation checks (API lives in TraceDog-backend)
 name: TraceDog CI
 
 on:
@@ -16,53 +16,6 @@ env:
   NODE_VERSION: "20"
 
 jobs:
-  backend-test:
-    name: Backend (pytest)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: backend/requirements-dev.txt
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: Run tests with coverage
-        env:
-          PYTHONPATH: .
-        run: |
-          pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing --junitxml=junit.xml
-
-      - name: Upload coverage to Codecov (optional)
-        uses: codecov/codecov-action@v4
-        if: hashFiles('backend/coverage.xml') != ''
-        continue-on-error: true
-        with:
-          files: backend/coverage.xml
-          flags: backend
-          fail_ci_if_error: false
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: backend-test-results
-          path: |
-            backend/junit.xml
-            backend/coverage.xml
-          if-no-files-found: ignore
-
   dashboard-build:
     name: Dashboard (Next.js build)
     runs-on: ubuntu-latest
@@ -78,7 +31,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          # Use a path that always exists; `package-lock.json` may not be committed yet.
           cache-dependency-path: dashboard/package.json
 
       - name: Install dependencies
@@ -112,22 +64,3 @@ jobs:
           TOKENIZERS_PARALLELISM: "false"
           OMP_NUM_THREADS: "1"
         run: python evaluation/scripts/verify_hf_dataset_revisions.py
-
-  docker-backend:
-    name: Docker (API image)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build API image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: false
-          tags: tracedog-api:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
