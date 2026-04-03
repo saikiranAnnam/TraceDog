@@ -30,7 +30,7 @@ function toggleInSet<T>(set: Set<T>, v: T): Set<T> {
 }
 
 export function TracesOverviewDashboard({ traces }: { traces: TraceListItem[] }) {
-  const [timeRange, setTimeRange] = useState<TimeRangeKey>("24h");
+  const [timeRange, setTimeRange] = useState<TimeRangeKey>("all");
   const [agentFilter, setAgentFilter] = useState("all");
   const [envFilter, setEnvFilter] = useState("all");
   const [experimentFilter, setExperimentFilter] = useState("all");
