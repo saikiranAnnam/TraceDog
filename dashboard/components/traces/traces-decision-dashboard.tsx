@@ -48,7 +48,7 @@ function StatusPill({ status }: { status: ReturnType<typeof traceRowStatus> }) {
 
 export function TracesDecisionDashboard({ traces }: { traces: TraceListItem[] }) {
   const [search, setSearch] = useState("");
-  const [timeRange, setTimeRange] = useState<TimeRangeKey>("24h");
+  const [timeRange, setTimeRange] = useState<TimeRangeKey>("all");
   const [riskFilter, setRiskFilter] = useState<RiskFilterKey>("all");
 
   const filtered = useMemo(() => {
