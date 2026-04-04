@@ -3,9 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DOCS_PALETTE_ENTRIES, type DocsPaletteEntry } from "@/lib/docs-nav";
+import { useDocsNav } from "@/components/docs/docs-nav-context";
 
 export function DocsCommandPalette() {
   const router = useRouter();
+  const { setActiveId } = useDocsNav();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
 
@@ -27,14 +29,13 @@ export function DocsCommandPalette() {
       if (entry.href) {
         router.push(entry.href);
       } else {
-        const el = document.getElementById(entry.id);
-        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setActiveId(entry.id);
         window.history.replaceState(null, "", `#${entry.id}`);
       }
       setOpen(false);
       setQ("");
     },
-    [router],
+    [router, setActiveId],
   );
 
   useEffect(() => {

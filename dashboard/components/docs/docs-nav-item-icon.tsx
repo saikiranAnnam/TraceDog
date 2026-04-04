@@ -1,18 +1,25 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  BarChart3,
   Bell,
   BookOpen,
   Brain,
   Bug,
   Code2,
+  FileCode2,
   FileText,
   FlaskConical,
+  GitFork,
+  KeyRound,
+  LayersIcon,
   LayoutDashboard,
+  Map,
   Network,
   Package,
   Rocket,
   Share2,
+  ShieldCheck,
   Waypoints,
   Zap,
 } from "lucide-react";
@@ -32,6 +39,15 @@ const BY_ID: Record<string, LucideIcon> = {
   "dashboard-usage": LayoutDashboard,
   debugging: Bug,
   examples: BookOpen,
+  introduction: BookOpen,
+  "use-cases": LayersIcon,
+  authentication: KeyRound,
+  "api-reference": FileCode2,
+  "reliability-scoring": BarChart3,
+  "claim-graph-guide": GitFork,
+  "sdk-python": Code2,
+  policies: ShieldCheck,
+  roadmap: Map,
 };
 
 type Props = {

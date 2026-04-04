@@ -11,17 +11,25 @@ type Props = {
   activeId: string;
   search: string;
   onSearch: (v: string) => void;
+  onSelectId?: (id: string) => void;
   /** Nested under app shell Docs item — tighter chrome */
   variant?: "default" | "embed";
 };
 
-export function DocsSidebar({ sections, activeId, search, onSearch, variant = "default" }: Props) {
+export function DocsSidebar({
+  sections,
+  activeId,
+  search,
+  onSearch,
+  onSelectId,
+  variant = "default",
+}: Props) {
   const pathname = usePathname() ?? "";
 
-  const scrollTo = useCallback((id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const selectSection = useCallback((id: string) => {
+    onSelectId?.(id);
     window.history.replaceState(null, "", `#${id}`);
-  }, []);
+  }, [onSelectId]);
 
   const showFilter = variant !== "embed";
 
@@ -93,7 +101,7 @@ export function DocsSidebar({ sections, activeId, search, onSearch, variant = "d
                         {inner}
                       </Link>
                     ) : (
-                      <button type="button" className={linkClass(active)} onClick={() => scrollTo(item.id)}>
+                      <button type="button" className={linkClass(active)} onClick={() => selectSection(item.id)}>
                         {inner}
                       </button>
                     )}

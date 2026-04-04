@@ -18,8 +18,9 @@ import {
   THRESHOLD_WEAK,
   type QualityTier,
 } from "@/lib/trace-quality";
-import type { ClaimGraphPayload, TraceDetail } from "@/lib/types";
+import type { ClaimGraphPayload, ExecutionGraphPayload, TraceDetail } from "@/lib/types";
 import { ClaimGraphSection } from "@/components/traces/claim-graph-section";
+import { ExecutionGraphView } from "@/components/traces/execution-graph-view";
 import { TraceMetadataKvList } from "@/components/traces/trace-metadata-kv";
 import { TraceCollapsibleSection } from "@/components/traces/trace-collapsible-section";
 import {
@@ -73,9 +74,11 @@ function simChipClass(tier: QualityTier): string {
 export function TraceDetailView({
   t,
   claimGraph,
+  executionGraph,
 }: {
   t: TraceDetail;
   claimGraph: ClaimGraphPayload | null;
+  executionGraph: ExecutionGraphPayload | null;
 }) {
   const tier = qualityTier(t);
   const failure = t.failure_type;
@@ -225,6 +228,20 @@ export function TraceDetailView({
 
         {/* 3 — Claim graph (supporting viz) */}
         {claimGraph ? <ClaimGraphSection graph={claimGraph} /> : null}
+
+        {/* 3b — Execution graph (agent flow DAG) */}
+        {executionGraph && executionGraph.nodes.length > 0 ? (
+          <section aria-labelledby="eg-heading">
+            <h2 className="tdv-section-h" id="eg-heading">
+              Agent execution graph
+            </h2>
+            <p className="tdv-section-sub">
+              Spans as a directed graph — shows which step in the agent pipeline ran and in what order.
+              Edges reflect declared parent→child dependencies when available, otherwise sequential chain.
+            </p>
+            <ExecutionGraphView graph={executionGraph} />
+          </section>
+        ) : null}
 
         {/* 4 — Evidence (log style) */}
         <section aria-labelledby="ev-heading">
@@ -383,6 +400,25 @@ export function TraceDetailView({
               <>
                 <h3 className="tdv-subpanel-title">Run metadata</h3>
                 <TraceMetadataKvList data={t.ingest_metadata} />
+              </>
+            ) : null}
+            {t.claim_grounding?.claims?.some(c => c.responsible_span_id) ? (
+              <>
+                <h3 className="tdv-subpanel-title">Claim attribution</h3>
+                <dl className="tdv-kv-list tdv-kv-list--tight">
+                  {t.claim_grounding.claims
+                    .filter(c => c.responsible_span_id)
+                    .map((c, i) => (
+                      <div key={i} className="tdv-kv-item">
+                        <dt className="tdv-kv-dt" style={{ fontStyle: "italic", maxWidth: "60%" }}>
+                          &ldquo;{c.claim_text.slice(0, 80)}{c.claim_text.length > 80 ? "\u2026" : ""}&rdquo;
+                        </dt>
+                        <dd className="tdv-kv-dd">
+                          <code className="tdv-code-inline">{c.responsible_span_id}</code>
+                        </dd>
+                      </div>
+                    ))}
+                </dl>
               </>
             ) : null}
             {t.spans && t.spans.length > 0 ? (

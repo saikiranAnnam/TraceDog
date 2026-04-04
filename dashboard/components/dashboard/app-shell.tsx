@@ -9,6 +9,7 @@ import { DocsSidebar } from "@/components/docs/docs-sidebar";
 import {
   Activity,
   BookOpen,
+  Bot,
   ChevronRight,
   Database,
   FlaskConical,
@@ -45,6 +46,12 @@ const primaryNav: NavItem[] = [
     label: "Traces",
     icon: <Activity size={16} strokeWidth={1.5} />,
     match: (p) => p === "/traces" || p.startsWith("/traces/"),
+  },
+  {
+    href: "/agents",
+    label: "Agents",
+    icon: <Bot size={16} strokeWidth={1.5} />,
+    match: (p) => p === "/agents" || p.startsWith("/agents/"),
   },
   {
     href: "/data",
@@ -98,7 +105,7 @@ function NavRow({
 }
 
 function AppShellDocsNavEmbed() {
-  const { productTab, activeId, navFilter, setNavFilter } = useDocsNav();
+  const { productTab, activeId, setActiveId, navFilter, setNavFilter } = useDocsNav();
   return (
     <div className="app-shell-docs-embed">
       <DocsSidebar
@@ -107,6 +114,7 @@ function AppShellDocsNavEmbed() {
         activeId={activeId}
         search={navFilter}
         onSearch={setNavFilter}
+        onSelectId={setActiveId}
       />
     </div>
   );
@@ -118,6 +126,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const dashboardMarketingNav =
     pathname === "/overview" ||
     pathname.startsWith("/traces") ||
+    pathname.startsWith("/agents") ||
     pathname.startsWith("/data") ||
     pathname === "/lab" ||
     pathname.startsWith("/lab/");

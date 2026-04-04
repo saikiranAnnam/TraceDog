@@ -1,0 +1,754 @@
+{
+  "sections": [
+    {
+      "id": "overview",
+      "eyebrow": "TraceDog",
+      "title": "Documentation",
+      "lead": "TraceDog is an observability and reliability layer for LLM applications. These docs explain the product model, API contract, reliability engine, and operating patterns needed to build and ship with confidence.",
+      "blocks": [
+        {
+          "type": "callout",
+          "variant": "insight",
+          "title": "30-second architecture pitch",
+          "text": "Your app sends one trace per model turn. TraceDog ingests it, computes grounding + claim-level reliability signals, persists the enriched result, and exposes fleet metrics plus deep per-trace debugging. The same contract is used for production requests and benchmark runners."
+        },
+        {
+          "type": "callout",
+          "variant": "insight",
+          "title": "What makes TraceDog different",
+          "items": [
+            "Claim-level explainability, not only aggregate quality numbers",
+            "Unified plane: production traces and offline evaluations share the same API",
+            "Actionable outputs for engineering teams: failure hints, severity, and repair loops"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "If you are new to the codebase, start with Quickstart, then read System flow, API ingest, Claim graph, and Processing plane."
+        }
+      ]
+    },
+    {
+      "id": "quickstart",
+      "title": "Quickstart",
+      "blocks": [
+        {
+          "type": "steps",
+          "items": [
+            "Start the API from TraceDog-backend (Render deployment or local Docker + Postgres).",
+            "Run this dashboard and set NEXT_PUBLIC_API_URL to API origin (do not include /api/v1).",
+            "Ingest at least one trace via POST /api/v1/traces.",
+            "Open /overview and /traces to verify data is visible and scored."
+          ]
+        },
+        {
+          "type": "callout",
+          "title": "Try TraceDog in 5 minutes",
+          "items": [
+            "Start API (local or deployed).",
+            "Set NEXT_PUBLIC_API_URL for dashboard.",
+            "Run: python scripts/seed_demo_traces.py with TRACEDOG_URL set to your API.",
+            "Inspect /overview for fleet stats and /traces/{id} for claim graph + reliability details."
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "For stable demos (recruiters, customer previews), seed deterministic traces first, then optionally run live benchmark/eval flows."
+        }
+      ]
+    },
+    {
+      "id": "how-it-works",
+      "title": "System flow",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A trace flows through four stages: ingest request -> reliability processing -> persistence -> dashboard/query APIs. Evaluation runners and production workloads both use this same lifecycle."
+        },
+        {
+          "type": "flow",
+          "nodes": ["Your app", "API", "TraceDog", "Scores + CGGE", "Dashboard"]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Write path is append-style per trace turn",
+            "Read path supports fleet trends and deep trace debugging",
+            "Metadata tagging (environment, dataset, experiment) is critical for slicing"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "claim-graph",
+      "title": "Claim graph",
+      "blocks": [
+        {
+          "type": "subheading",
+          "text": "What it is"
+        },
+        {
+          "type": "paragraph",
+          "text": "Claim graph is the explainability layer for reliability. It transforms a raw response into inspectable claim nodes connected to evidence nodes, then surfaces support/unsupported relationships that power both debugging and scoring."
+        },
+        {
+          "type": "flow",
+          "nodes": ["LLM response", "Claim decomposition", "Evidence linking", "Graph + labels", "Risk + insights"]
+        },
+        {
+          "type": "subheading",
+          "text": "Internal processing flow"
+        },
+        {
+          "type": "steps",
+          "items": [
+            "Response intake: capture prompt, answer, model metadata, latency, and retrieved context.",
+            "Claim extraction: split answer into atomic claims that can be independently verified.",
+            "Evidence matching: map each claim to best supporting chunks/spans from retrieved docs.",
+            "Graph construction: create claim nodes, evidence nodes, and labeled edges.",
+            "Scoring + RCA: aggregate claim support into groundedness, hallucination risk, reliability, and root-cause signals."
+          ]
+        },
+        {
+          "type": "subheading",
+          "text": "Node details"
+        },
+        {
+          "type": "paragraph",
+          "text": "LLM response: raw output enters as unstructured text. Claim graph converts this into structured units that can be verified independently."
+        },
+        {
+          "type": "paragraph",
+          "text": "Claim extraction: response text is segmented into atomic claims. This enables mixed-quality answers to be diagnosed correctly instead of receiving one coarse verdict."
+        },
+        {
+          "type": "paragraph",
+          "text": "Claim nodes: each node carries claim text, support score, contradiction-like signal, best evidence references, and an interpretable verification label."
+        },
+        {
+          "type": "paragraph",
+          "text": "Evidence layer: retrieved documents/chunks become evidence nodes. Claim-to-evidence edges are built via semantic similarity and attribution heuristics."
+        },
+        {
+          "type": "paragraph",
+          "text": "Scoring layer: claim-level support signals are aggregated into groundedness, unsupported ratio, hallucination risk, reliability score, and severity outputs."
+        },
+        {
+          "type": "subheading",
+          "text": "Code and payload shape"
+        },
+        {
+          "type": "code",
+          "title": "Claim graph API shape (example)",
+          "code": "{\n  \"trace_id\": \"fb7ce4b9-...\",\n  \"nodes\": [\n    { \"id\": \"claim-0\", \"type\": \"claim\", \"label\": \"Refund takes up to 7 business days\" },\n    { \"id\": \"doc-1\", \"type\": \"evidence\", \"label\": \"policy-1\" }\n  ],\n  \"edges\": [\n    { \"source\": \"claim-0\", \"target\": \"doc-1\", \"relation\": \"supported\", \"score\": 0.91 }\n  ],\n  \"summary\": {\n    \"unsupported_ratio\": 0.0,\n    \"claim_count\": 1\n  }\n}"
+        },
+        {
+          "type": "paragraph",
+          "text": "Where it fits in architecture: claim graph is produced in the processing plane during reliability analysis, persisted with the trace, then read by dashboard trace detail for investigator workflows."
+        },
+        {
+          "type": "subheading",
+          "text": "Design decisions and trade-offs"
+        },
+        {
+          "type": "paragraph",
+          "text": "Why graph (instead of scalar-only): aggregate scores hide root cause. Graph view reveals which exact claims failed and against which evidence."
+        },
+        {
+          "type": "paragraph",
+          "text": "Why claim-level granularity (instead of full-answer only): whole-answer scoring is too coarse for partially correct outputs, which are common in production."
+        },
+        {
+          "type": "paragraph",
+          "text": "Why persisted graph artifacts (instead of recomputing in UI): deterministic debugging and lower read latency. Persisted artifacts keep incident reviews reproducible."
+        },
+        {
+          "type": "paragraph",
+          "text": "Why hybrid evidence signals (instead of vector-only): semantic similarity alone can miss contradiction and partial-support patterns."
+        },
+        {
+          "type": "subheading",
+          "text": "Signals this powers"
+        },
+        {
+          "type": "paragraph",
+          "text": "Grounding score: measures how strongly response claims are supported by linked evidence."
+        },
+        {
+          "type": "paragraph",
+          "text": "Hallucination risk: captures unsupported or weakly justified claims likely to mislead users."
+        },
+        {
+          "type": "paragraph",
+          "text": "Attribution recall: tracks whether surfaced evidence aligns with expected supporting facts."
+        },
+        {
+          "type": "paragraph",
+          "text": "Root-cause label: summarizes likely failure source (retrieval gap, unsupported synthesis, etc.)."
+        },
+        {
+          "type": "subheading",
+          "text": "Who this helps"
+        },
+        {
+          "type": "paragraph",
+          "text": "Developers: identify exact claim failures and fix retrieval/prompt/model issues with measurable reverify deltas."
+        },
+        {
+          "type": "paragraph",
+          "text": "Product managers: monitor reliability trends and communicate trust posture with evidence-backed explanations."
+        },
+        {
+          "type": "paragraph",
+          "text": "Hiring/business stakeholders: understand product differentiation through explainable reliability, not black-box score reporting."
+        },
+        {
+          "type": "subheading",
+          "text": "Debug playbook"
+        },
+        {
+          "type": "paragraph",
+          "text": "Debugging pattern: start with highest-risk claims, inspect linked evidence, classify failure source (retrieval coverage, prompt constraints, model behavior), then apply repair/reverify and confirm deltas."
+        },
+        {
+          "type": "subheading",
+          "text": "Implementation and code references"
+        },
+        {
+          "type": "paragraph",
+          "text": "Claim graph is implemented in TraceDog-backend across the reliability processing path. The most useful developer entry points are below."
+        },
+        {
+          "type": "code",
+          "title": "TraceDog-backend modules to read first",
+          "code": "app/\n  services/\n    trace_service.py\n    claim_graph.py\n  reliability/\n    cgge.py\n    similarity.py\n    grounding_metrics.py\n    hybrid_hallucination.py\n    incident_severity.py"
+        },
+        {
+          "type": "paragraph",
+          "text": "How it is built today: trace_service orchestrates ingest + scoring, cgge.py decomposes claims and computes claim labels, and services/claim_graph.py transforms persisted fields into React Flow-friendly nodes/edges."
+        },
+        {
+          "type": "code",
+          "title": "Extraction and graph build snippets",
+          "code": "# app/reliability/cgge.py\ndef decompose_claims(response: str) -> list[str]:\n    parts = re.split(r\"\\\\.|;|\\\\band\\\\b\", response, flags=re.IGNORECASE)\n    return [p.strip() for p in parts if p.strip()]\n\n# app/services/claim_graph.py\ndef build_claim_graph(trace_id: str, detail_dict: dict[str, Any]) -> dict[str, Any]:\n    claims = (detail_dict.get(\"claim_grounding\") or {}).get(\"claims\") or []\n    docs = detail_dict.get(\"retrieved_docs\") or []\n    # build nodes + edges"
+        },
+        {
+          "type": "subheading",
+          "text": "Research foundations"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "FEVER (Thorne et al., 2018): claim-level fact verification against evidence.",
+            "RAG (Lewis et al., 2020): retrieval-grounded generation for knowledge-intensive tasks.",
+            "SelfCheckGPT (Manakul et al., 2023): practical hallucination-detection intuition.",
+            "HotpotQA (Yang et al., 2018): multi-hop evidence requirements.",
+            "Faithfulness/attribution literature (FactCC, QAGS, later surveys): output-evidence alignment."
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "TraceDog combines these lines into one production pipeline: claim decomposition, retrieval grounding, hybrid support scoring, and operational reliability outputs."
+        },
+        {
+          "type": "subheading",
+          "text": "Design philosophy and trade-offs"
+        },
+        {
+          "type": "paragraph",
+          "text": "Deterministic debugging over transient recomputation: claim-graph artifacts are persisted so incident review remains reproducible."
+        },
+        {
+          "type": "paragraph",
+          "text": "Layered evaluation over single-metric evaluation: chunk-level signals provide broad recall while claim-level signals provide interpretable precision."
+        },
+        {
+          "type": "paragraph",
+          "text": "Partial-credit awareness over binary correctness: mixed-quality responses are common, so graded support labels reflect reality better than pass/fail scoring."
+        },
+        {
+          "type": "paragraph",
+          "text": "Extensibility over lock-in: graph contracts allow future contradiction classifiers, verifier models, and learned risk models without rewriting dashboard consumers."
+        },
+        {
+          "type": "subheading",
+          "text": "Who this helps"
+        },
+        {
+          "type": "paragraph",
+          "text": "Developers: inspect claim-level failures quickly, then apply retrieval/prompt/model changes and validate with reverify deltas."
+        },
+        {
+          "type": "paragraph",
+          "text": "Product managers: monitor reliability trends and communicate trust posture with concrete evidence-backed explanation."
+        },
+        {
+          "type": "paragraph",
+          "text": "Hiring/business audiences: understand differentiation through explainable reliability, not only benchmark score tables."
+        },
+        {
+          "type": "subheading",
+          "text": "Debug playbook"
+        },
+        {
+          "type": "paragraph",
+          "text": "Start with highest-risk claims, inspect linked evidence, classify failure source (retrieval, synthesis, unsupported claims), run repair/reverify, then confirm metric and label movement."
+        },
+        {
+          "type": "subheading",
+          "text": "End-to-end example"
+        },
+        {
+          "type": "code",
+          "title": "Input -> claim graph -> final signals",
+          "code": "Q: How long does refund processing take?\nContext: Processing takes up to seven business days after approval.\n\nResponse: Refunds are processed within seven days after manager approval.\n\nClaim graph:\n- claim-0 label: supported\n- support_score: 0.82\n- evidence: doc-1\n\nFinal signals:\n- grounding_score: 0.81\n- hallucination_risk: 0.18\n- reliability_score: 0.84\n- severity: SEV-5"
+        }
+      ]
+    },
+    {
+      "id": "repair",
+      "title": "Repair + reverify",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Repair endpoints support closed-loop reliability workflows. You can execute a repair run and reverify candidate responses against the same context/evidence to measure improvement (or regression)."
+        },
+        {
+          "type": "endpoints",
+          "items": [
+            { "method": "POST", "path": "/api/v1/traces/{id}/repair/execute" },
+            { "method": "POST", "path": "/api/v1/traces/{id}/repair/reverify" }
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Use execute to create/record repair attempt",
+            "Use reverify to score modified answers with the same trace context",
+            "Track before/after deltas for reliability, grounding, and severity"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Operationally, repair/reverify is where model experimentation becomes measurable: every proposed response change can be evaluated against the same evidence baseline."
+        }
+      ]
+    },
+    {
+      "id": "technical-concepts",
+      "title": "Technical concepts",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Trace: one model turn with input, output, context, latency, model metadata",
+            "Grounding: evidence support quality at chunk and claim levels",
+            "CGGE: Claim Graph Grounding Engine; claim decomposition + evidence linking + support labels",
+            "Reliability signals: hallucination risk, reliability score, failure hints, incident severity",
+            "Lineage metadata: dataset/experiment tags for reproducible evaluation slices"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Think in layers: data quality (what you measured), scoring quality (how you measured it), and operator usability (how quickly teams can act on results)."
+        }
+      ]
+    },
+    {
+      "id": "tracing",
+      "title": "Trace schema",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A trace payload captures prompt, response, model identity, latency, retrieved_docs, and optional spans/metadata. This is the canonical unit for both observability and quality analysis."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Keep doc_id stable across runs for better debugging and comparisons",
+            "Always send environment/experiment tags in metadata for filtering",
+            "Prefer complete retrieval context over truncated evidence where possible"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "If traces come from multiple services, standardize metadata keys early. This prevents dashboard fragmentation and makes long-term trend analysis reliable."
+        }
+      ]
+    },
+    {
+      "id": "evaluation",
+      "title": "Evaluation engine (CGGE)",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "CGGE decomposes responses into claims and checks each claim against available evidence signals (semantic + lexical). Outputs are aggregated into reliability metrics and explainability artifacts used across UI and APIs."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Per-claim support state helps isolate failure modes",
+            "Hybrid metrics combine chunk-level and claim-level evidence",
+            "Scoring outputs include both numeric metrics and qualitative failure hints"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "CGGE should be treated as explainability infrastructure, not only a metric generator: its output should guide concrete engineering actions."
+        }
+      ]
+    },
+    {
+      "id": "backend-architecture",
+      "title": "Backend architecture",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Backend is a FastAPI service organized around domain modules: ingest endpoints, scoring/reliability services, repair/reverify flows, and read APIs for dashboard views (including claim graph). Persistence is PostgreSQL."
+        },
+        {
+          "type": "paragraph",
+          "text": "Backend source: https://github.com/saikiranAnnam/TraceDog-backend"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "API layer: request validation + endpoint composition",
+            "Service layer: scoring orchestration and reliability logic",
+            "Model/schema layer: typed contracts for traces and results",
+            "Jobs/admin layer: experiment/evaluation operations"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Design rule: keep endpoint handlers thin and deterministic; push business logic into services so behavior is testable and reusable across API endpoints and job runners."
+        }
+      ]
+    },
+    {
+      "id": "data-plane",
+      "title": "Data plane (evaluation)",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Data plane focuses on evaluation input quality and reproducibility. Benchmark rows are loaded through a source registry + fetch pipeline, adapted into EvalCase format, then ingested as traces."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Registry ids and revision pins define source-of-truth datasets",
+            "Fetch pipeline applies retries, validation, optional caching, and events",
+            "Eval lineage metadata ties runs to data source + model + experiment"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "When evaluating release quality, data-plane reproducibility is as important as model quality. Pinning and lineage are what make week-over-week comparisons trustworthy."
+        }
+      ]
+    },
+    {
+      "id": "processing-plane",
+      "title": "Processing plane (reliability engine)",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Processing plane is the product core. It transforms raw trace payloads into reliability outcomes using grounding metrics, claim-level CGGE, hybrid risk scoring, failure typing, and severity classification."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Scores are explainable through claim/evidence outputs",
+            "Failure hints map low-level signals to actionable debugging paths",
+            "Severity enables operational workflows and prioritization"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "This is the core product moat: converting unstructured model outputs into decision-grade reliability signals that product and engineering teams can operationalize."
+        }
+      ]
+    },
+    {
+      "id": "experiments",
+      "title": "Experiments",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Experiments layer lets you compare model behavior under consistent conditions. Tag traces via ingest_metadata and reuse the same backend APIs for smoke tests, eval runs, and live demos."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Use experiment_name and dataset tags consistently",
+            "Compare runs by model, prompt strategy, and retrieval setup",
+            "Keep experiments on same scoring stack as production to avoid drift"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "A good experiment isolates one variable at a time. Keep prompts, retrieval, and datasets fixed while changing a single dimension (model/version/policy)."
+        }
+      ]
+    },
+    {
+      "id": "dashboard-usage",
+      "title": "Dashboard usage",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Dashboard offers two views: fleet-level health and trace-level diagnostics. Use /overview for trends and incident posture, /traces for filtering/search, and trace detail for claim graph + root cause analysis."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Overview is for release confidence and trend monitoring",
+            "Traces view is for active debugging and failure slicing",
+            "Trace detail is for claim-level root-cause understanding"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "debugging",
+      "title": "Debug a trace",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Recommended debug path: input -> output -> claims -> scores -> root-cause hints -> repair candidate -> reverify. Keep evidence context visible during each step."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Start with high-risk traces first",
+            "Identify unsupported/conflicting claims",
+            "Validate retrieval coverage before changing prompts/models",
+            "Use reverify deltas to confirm fixes are real"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Do not stop at improved aggregate scores; validate that claim-level support actually improved and that severity/failure reason moved in the expected direction."
+        }
+      ]
+    },
+    {
+      "id": "examples",
+      "title": "Examples",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Evaluation runners under evaluation/runners (SQuAD, HotpotQA) call your model, submit traces to TraceDog, and aggregate reliability/CGGE metrics. This provides reproducible before/after comparisons for releases."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Store JSONL outputs for change tracking across commits",
+            "Pair aggregate metrics with representative failure samples",
+            "Use fixed dataset slices for apples-to-apples comparisons"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "release-readiness",
+      "title": "Release readiness",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Frontend (TraceDog) deploys independently from backend (TraceDog-backend)",
+            "Set NEXT_PUBLIC_API_URL to API origin (no /api/v1 suffix)",
+            "Configure CORS and ADMIN_API_KEY for docs/experiments admin flows",
+            "Run seed script and verify /overview, /traces, and /docs navigation",
+            "For public demos: validate health endpoint, claim graph, and one experiment flow"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Pre-demo checklist: health endpoint, seed ingest, trace detail graph rendering, one experiments run, and documentation nav sanity check."
+        }
+      ]
+    },
+    {
+      "id": "introduction",
+      "eyebrow": "TraceDog",
+      "title": "What is TraceDog?",
+      "lead": "Observability for AI agents — trace execution, detect hallucinations, and enforce reliability at scale.",
+      "blocks": [
+        { "type": "subheading", "text": "The Problem" },
+        { "type": "paragraph", "text": "When an AI agent gives a wrong answer, you have no idea why. Was it bad retrieval? A failed tool call? The LLM reasoning off the rails? Without observability, every incident is a black box. TraceDog fixes that." },
+        { "type": "bullets", "items": [ "No execution visibility — you can't see what the agent actually did step by step", "Hallucinations ship silently — LLMs assert facts that no retrieved document supports", "Tool failures go undetected — agents proceed with wrong context after silent errors", "No reliability metrics — you can't track whether agent quality is improving or degrading over time", "Debugging is slow — reproducing a bad response requires re-running the full agent" ] },
+        { "type": "subheading", "text": "How It Works" },
+        { "type": "paragraph", "text": "Instrument your agent with the TraceDog Python SDK or send traces directly to the REST API. The Trace Collector ingests each execution — query, retrieved context, LLM reasoning steps, tool calls, and final response. The Reliability Engine decomposes the response into atomic claims, verifies each claim against retrieved evidence, and produces a structured grounding graph. The Dashboard surfaces the full trace, a 0–100 reliability score, and claim-level verdicts so you can see exactly what went wrong and where." },
+        { "type": "flow", "nodes": [ "SDK / REST API", "Trace Collector", "Reliability Engine", "Dashboard" ] },
+        { "type": "subheading", "text": "What TraceDog Gives You" },
+        { "type": "bullets", "items": [ "Trace Viewer — full execution replay: query → retrieval → reasoning → tool calls → response", "Reliability Score — a 0–100 composite metric combining grounding, tool consistency, retrieval quality, and latency", "Claim-Level Grounding — every assertion in the agent response is verified against evidence and labeled supported, partial, contradicted, or unsupported", "Repair Suggestions — actionable guidance on which retrieval step, tool call, or prompt contributed to the failure" ] },
+        { "type": "subheading", "text": "Who Uses TraceDog" },
+        { "type": "bullets", "items": [ "ML engineers building and iterating on RAG pipelines", "Platform teams owning reliability SLAs for production AI systems", "Anyone deploying LLM copilots or autonomous agents where factual accuracy matters" ] },
+        { "type": "callout", "title": "Framework Agnostic", "text": "TraceDog works with any AI framework — LangChain, LlamaIndex, OpenAI Assistants, custom agents — via a simple REST API or Python SDK. No vendor lock-in. If your agent can make an HTTP call, it can send traces to TraceDog.", "variant": "insight" },
+        { "type": "cards", "title": "Core Capabilities", "items": [ { "title": "Agent Tracing", "text": "Records the full execution graph of an agent run — every retrieval step, LLM call, tool invocation, and intermediate reasoning state. Queryable and replayable from the dashboard." }, { "title": "Hallucination Detection", "text": "Decomposes LLM responses into atomic claims and verifies each against retrieved evidence. Returns a grounding score, unsupported claim count, and contradiction flags per response." }, { "title": "Reliability Scoring", "text": "A 0–100 composite score weighted across grounding (40%), tool consistency (30%), retrieval quality (20%), and latency (10%). Tracked over time so you can measure improvement." }, { "title": "AI Guardrails", "text": "Developer-defined policies that fire at runtime. Example: if hallucination_risk > 0.5, block the response. Supports warn, block, and escalate actions with Slack and webhook delivery." } ] }
+      ]
+    },
+    {
+      "id": "use-cases",
+      "eyebrow": "Product",
+      "title": "Use Cases",
+      "lead": "TraceDog is built for teams running AI agents in production where factual errors, tool failures, or compliance gaps have real consequences.",
+      "blocks": [
+        { "type": "cards", "title": "Production Scenarios", "items": [ { "title": "RAG-Based Customer Support Agent", "text": "Problem: When the retriever returns low-relevance documents, the LLM fills the gap by hallucinating. These errors reach customers before anyone notices.\n\nHow TraceDog helps: The Claim Graph Engine verifies every assertion against the retrieved chunks. Unsupported claims are flagged before delivery. A guardrail policy (hallucination_risk > 0.5 → block) prevents the bad response from reaching the user.\n\nMetric: hallucination_rate — measurable reduction in unsupported claims shipped to users." }, { "title": "Autonomous Coding Agent", "text": "Problem: The agent calls a code execution tool, gets a silent error, but continues reasoning as if the call succeeded. It generates a fix based on wrong assumptions.\n\nHow TraceDog helps: Every tool call is recorded with input, output, status code, and latency. TraceDog classifies failures as tool_misuse when the agent proceeds without handling an error state.\n\nMetric: tool_failure_rate — see which tools fail most and how often the agent handles failures correctly." }, { "title": "Enterprise Q&A Copilot with Compliance Requirements", "text": "Problem: Legal and compliance teams need to know what the AI said, what evidence it used, and how confident the system was — for every response.\n\nHow TraceDog helps: TraceDog logs the full execution of every agent run with a stable trace ID and timestamp. Audit exports give compliance teams a structured record tied to each conversation.\n\nMetric: avg_reliability_score — a consistent record of system quality over time." }, { "title": "Model Upgrade Validation", "text": "Problem: You want to switch from GPT-3.5 to GPT-4. Vibes-based testing is not enough. You need to know whether the new model is actually more reliable on your specific workload.\n\nHow TraceDog helps: Run the evaluation pipeline against both models. TraceDog lets you compare reliability scores, hallucination rates, grounding distributions, and latency side by side.\n\nMetric: avg_reliability_score delta between model versions — a data-backed upgrade decision." } ] },
+        { "type": "subheading", "text": "Incident Lifecycle" },
+        { "type": "paragraph", "text": "When a reliability issue occurs in production, TraceDog gives you a structured path from detection to fix — without re-running the agent or guessing at root cause." },
+        { "type": "flow", "nodes": [ "Agent responds", "TraceDog scores it", "Policy fires (warn / block / escalate)", "Alert created (Slack / webhook)", "Engineer debugs in dashboard", "Fix deployed" ] },
+        { "type": "callout", "title": "Proactive vs. Reactive", "text": "Most teams start using TraceDog reactively — investigating a bad response after a user complaint. The real value comes when you set up guardrail policies and reliability thresholds, so TraceDog catches failures before users do.", "variant": "insight" }
+      ]
+    },
+    {
+      "id": "claim-graph-guide",
+      "eyebrow": "Core Concepts",
+      "title": "Understanding the Claim Graph",
+      "lead": "The Claim Graph is how TraceDog tells you not just that a response is unreliable, but exactly which fact is wrong and why.",
+      "blocks": [
+        { "type": "subheading", "text": "What Is a Claim?" },
+        { "type": "paragraph", "text": "A claim is a single atomic assertion extracted from the agent's response. TraceDog decomposes every response into its smallest verifiable facts before checking any of them." },
+        { "type": "bullets", "items": [ "\"Refunds take 2 business days\" — a claim about a time duration", "\"This feature is available on the Pro plan\" — a claim about product availability", "\"The function returns a list of strings\" — a claim about code behavior" ] },
+        { "type": "subheading", "text": "What Is Evidence?" },
+        { "type": "paragraph", "text": "Evidence is any retrieved chunk that the agent had access to when generating its response — a passage from a knowledge base, a row from a database query, or the output of a tool call. TraceDog tracks which evidence was available and checks whether each claim is supported by it." },
+        { "type": "subheading", "text": "Edge Types" },
+        { "type": "bullets", "items": [ "Supports (green) — the evidence directly and fully backs the claim.", "Partial (yellow) — the evidence is related but does not fully confirm the claim.", "Contradicts (red) — the evidence explicitly conflicts with the claim. This is the most severe signal.", "Unsupported (gray, no edge) — no retrieved evidence connects to this claim at all." ] },
+        { "type": "subheading", "text": "A Concrete Example" },
+        { "type": "paragraph", "text": "Agent response: \"Refunds take 2 business days.\" Retrieved document: \"Refunds are processed within 3 to 5 business days.\" TraceDog extracts the claim, finds the evidence chunk, and creates a contradicts edge (red). The grounding score for this claim is 0. The response is flagged for review." },
+        { "type": "subheading", "text": "How to Read the Grounding Score" },
+        { "type": "bullets", "items": [ "grounding_score = supported_claims / total_claims", "unsupported_claim_count = claims with no evidence edge", "hallucination_risk is elevated when unsupported_claim_count > 0 or any contradicts edge exists" ] },
+        { "type": "subheading", "text": "When to Act" },
+        { "type": "bullets", "items": [ "2 or more unsupported claims — review retrieval quality and prompt context window", "Any contradicts edge (red) — treat as a reliability incident", "Grounding score below 0.6 — consider blocking via a guardrail policy" ] },
+        { "type": "callout", "title": "Why Claim Graphs Beat Single Scores", "text": "Claim graphs let you pinpoint exactly which fact is wrong, rather than re-running the whole agent. A reliability score of 0.55 tells you something is off. A claim graph tells you it was the third sentence — the one about refund timing — that had no grounding.", "variant": "insight" },
+        { "type": "subheading", "text": "Accessing the Claim Graph in the Dashboard" },
+        { "type": "steps", "items": [ "Open the TraceDog dashboard and navigate to the Traces section.", "Select any trace — use the reliability score or hallucination risk columns to find candidates.", "On the Trace Detail page, click the Claim Graph tab.", "The bipartite graph renders with claims on the left and evidence chunks on the right.", "Click any claim node to see its verdict, matched evidence, and confidence score." ] }
+      ]
+    },
+    {
+      "id": "roadmap",
+      "eyebrow": "Product",
+      "title": "Product Roadmap",
+      "lead": "TraceDog is under active development. Here is what is available today, what is being built next, and what is planned further out.",
+      "blocks": [
+        { "type": "subheading", "text": "Available Now" },
+        { "type": "bullets", "items": [ "Python SDK — instrument any agent with a few lines of code", "Trace Ingestion API — REST endpoint for submitting agent execution traces from any framework", "Reliability Scoring — composite 0–100 score: grounding (40%), tool consistency (30%), retrieval quality (20%), latency (10%)", "Claim-Level Grounding Analysis — decomposes responses into atomic claims and verifies each against retrieved evidence", "Dashboard: Trace List — filterable list of all agent runs with reliability scores and failure flags", "Dashboard: Trace Detail — full execution replay with step-by-step breakdown", "Dashboard: Claim Graph Viewer — interactive bipartite graph showing claim-evidence relationships", "Policies and Guardrails — developer-defined rules (warn / block / escalate)", "Evaluation Runners — SQuAD v2 and HotpotQA benchmark runners" ] },
+        { "type": "subheading", "text": "Coming Next (Phase 3)" },
+        { "type": "bullets", "items": [ "Node.js SDK — first-class support for JavaScript and TypeScript agent stacks", "Proxy Mode — auto-intercept LLM calls without any code changes", "Real-Time Alerts — Slack, email, and webhook notifications when reliability thresholds are breached", "Repair Suggestions — actionable guidance on which retrieval step or prompt change would fix a detected failure", "Advanced Causal Root-Cause View — traces failures back through the execution graph to the originating step" ] },
+        { "type": "subheading", "text": "Future (Phases 4 and 5)" },
+        { "type": "bullets", "items": [ "Automated Evaluation at Scale — simulate 1000+ conversations against your agent", "AI Governance Mode — compliance logging, policy enforcement audit trails, SOC 2 support", "Multi-Model Comparison — compare reliability scores across model versions in the dashboard", "Enterprise: SSO, RBAC, and Private Cloud Deployment" ] },
+        { "type": "callout", "title": "Shape the Roadmap", "text": "Have a use case not covered here? Reach out. TraceDog is being built for real production teams and direct feedback determines what gets prioritized next.", "variant": "insight" }
+      ]
+    },
+    {
+      "id": "authentication",
+      "title": "Authentication",
+      "eyebrow": "API Keys",
+      "lead": "TraceDog uses API keys to authenticate requests. Every API key belongs to an organization. You create and manage keys in the dashboard.",
+      "blocks": [
+        { "type": "subheading", "text": "Creating an API Key" },
+        { "type": "steps", "items": [ "Go to Settings → API Keys in your dashboard.", "Click New API Key.", "Choose a scope: read, write, or admin.", "Copy the key immediately — it will not be shown again." ] },
+        { "type": "subheading", "text": "Key Format" },
+        { "type": "bullets", "items": [ "`td_live_...` — production key. Use in your prod environment.", "`td_test_...` — test key. Use in local dev and CI." ] },
+        { "type": "subheading", "text": "Sending the Key" },
+        { "type": "code", "title": "curl", "code": "curl https://api.tracedog.io/v1/traces \\\n  -H \"Authorization: Bearer td_live_your_api_key_here\"" },
+        { "type": "code", "title": "Python — httpx", "code": "import httpx\nimport os\n\nclient = httpx.Client(\n    base_url=\"https://api.tracedog.io/v1\",\n    headers={\"Authorization\": f\"Bearer {os.environ['TRACEDOG_API_KEY']}\"},\n)\n\nresponse = client.get(\"/traces\")\nprint(response.json())" },
+        { "type": "cards", "title": "Key Scopes", "items": [ { "title": "read", "text": "Fetch traces, metrics, claims, policies, and alerts. Safe for dashboards and monitoring scripts." }, { "title": "write", "text": "Ingest traces and create or update policies. Required for SDK instrumentation." }, { "title": "admin", "text": "Full access including key management. Restrict this to automated provisioning only." } ] },
+        { "type": "callout", "title": "Never commit API keys", "text": "Store keys in environment variables, not source code. Use `os.environ['TRACEDOG_API_KEY']` in Python or an `.env` file with a secrets manager in CI.", "variant": "insight" },
+        { "type": "cards", "title": "Authentication Errors", "items": [ { "title": "401 Unauthorized", "text": "The key is missing, malformed, or has been revoked. Rotate the key in Settings → API Keys." }, { "title": "403 Forbidden", "text": "The key is valid but lacks the required scope. Create a new key with write or admin scope." } ] }
+      ]
+    },
+    {
+      "id": "sdk-python",
+      "title": "Python SDK",
+      "eyebrow": "Instrumentation",
+      "lead": "The TraceDog Python SDK wraps your AI agent calls and sends execution traces to TraceDog automatically. You get reliability scores back without changing your agent logic.",
+      "blocks": [
+        { "type": "subheading", "text": "Install" },
+        { "type": "code", "title": "pip", "code": "pip install tracedog" },
+        { "type": "subheading", "text": "Initialize the Client" },
+        { "type": "code", "title": "Python", "code": "from tracedog import TraceDog\nimport os\n\ntd = TraceDog(api_key=os.environ[\"TRACEDOG_API_KEY\"])" },
+        { "type": "subheading", "text": "Option 1 — Decorator" },
+        { "type": "code", "title": "Python", "code": "from tracedog import TraceDog\nimport os\n\ntd = TraceDog(api_key=os.environ[\"TRACEDOG_API_KEY\"])\n\n@td.trace(agent=\"support-bot\", environment=\"prod\", model=\"gpt-4\")\ndef run_agent(prompt: str) -> str:\n    response = call_llm(prompt)\n    return response" },
+        { "type": "subheading", "text": "Option 2 — Manual Trace" },
+        { "type": "code", "title": "Python", "code": "result = td.trace_run(\n    agent=\"support-bot\",\n    environment=\"prod\",\n    model=\"gpt-4\",\n    prompt=\"What is the refund policy?\",\n    response=\"Refunds are processed within 2 business days.\",\n    retrieved_docs=[\n        {\n            \"doc_id\": \"doc_1\",\n            \"content\": \"Our refund policy allows returns within 30 days...\",\n            \"relevance_score\": 0.87,\n        }\n    ],\n)\n\nprint(result.trace_id)           # tr_abc123\nprint(result.reliability_score)  # 91\nprint(result.hallucination_risk) # 0.08" },
+        { "type": "subheading", "text": "retrieved_docs Format" },
+        { "type": "code", "title": "retrieved_docs schema", "code": "retrieved_docs = [\n    {\n        \"doc_id\": \"doc_1\",          # required\n        \"content\": \"Full text...\",  # required\n        \"relevance_score\": 0.87,    # optional\n    }\n]" },
+        { "type": "subheading", "text": "tool_calls Format" },
+        { "type": "code", "title": "tool_calls schema", "code": "tool_calls = [\n    {\n        \"tool_name\": \"search_knowledge_base\",  # required\n        \"input\": {\"query\": \"refund policy\"},   # required\n        \"output\": {\"results\": [\"doc_1\"]},       # required\n        \"status\": \"success\",                    # \"success\" | \"error\"\n    }\n]" },
+        { "type": "subheading", "text": "Full RAG Agent Example" },
+        { "type": "code", "title": "Python — instrumented RAG agent", "code": "import os\nfrom tracedog import TraceDog\n\ntd = TraceDog(api_key=os.environ[\"TRACEDOG_API_KEY\"])\n\ndef answer_question(prompt: str) -> str:\n    docs = retrieve(prompt)\n    retrieved_docs = [\n        {\"doc_id\": d.id, \"content\": d.text, \"relevance_score\": d.score}\n        for d in docs\n    ]\n    response = chat(prompt=prompt, context=docs)\n    result = td.trace_run(\n        agent=\"support-bot\",\n        environment=\"prod\",\n        model=\"gpt-4\",\n        prompt=prompt,\n        response=response,\n        retrieved_docs=retrieved_docs,\n    )\n    if result.abstain:\n        return \"I don't have enough information to answer that reliably.\"\n    return response" },
+        { "type": "callout", "title": "Checking the abstain flag", "text": "When TraceDog determines the response is too risky to return, `result.abstain` is `True`. Check this flag in production to avoid surfacing low-quality answers to users.", "variant": "insight" }
+      ]
+    },
+    {
+      "id": "reliability-scoring",
+      "title": "Reliability Scoring",
+      "eyebrow": "How Scores Work",
+      "lead": "Every trace gets a Reliability Score from 0 to 100. It tells you how much you can trust the agent's response before returning it to a user.",
+      "blocks": [
+        { "type": "subheading", "text": "What the Score Measures" },
+        { "type": "cards", "title": "Score components", "items": [ { "title": "Grounding — 40%", "text": "How well each claim in the response is supported by the documents your agent retrieved. Low grounding = high hallucination risk." }, { "title": "Tool Consistency — 30%", "text": "Whether tool calls succeeded and whether the response actually used their outputs." }, { "title": "Retrieval Quality — 20%", "text": "Whether the retrieved documents were relevant to the query." }, { "title": "Latency — 10%", "text": "Whether response time is within expected bounds for the agent." } ] },
+        { "type": "subheading", "text": "Grounding Score" },
+        { "type": "paragraph", "text": "The grounding score (0.0–1.0) measures how well the response is supported by retrieved documents. TraceDog breaks the response into individual claims, then checks each claim against the evidence. The grounding score is the proportion of claims that are supported." },
+        { "type": "subheading", "text": "Hallucination Risk" },
+        { "type": "paragraph", "text": "Hallucination risk (0.0–1.0) is the inverse of grounding. A grounding score of 0.85 means a hallucination risk of 0.15. A risk above 0.5 means more than half the response's claims have no supporting evidence." },
+        { "type": "subheading", "text": "Failure Types" },
+        { "type": "cards", "title": "failure_type values", "items": [ { "title": "hallucination", "text": "The response contains claims not supported by retrieved documents." }, { "title": "retrieval_failure", "text": "Retrieved documents were irrelevant, empty, or missing entirely." }, { "title": "tool_misuse", "text": "A tool was called with bad inputs, returned an error, or its output was ignored." }, { "title": "policy_violation", "text": "The trace breached a threshold defined in your org's policies." }, { "title": "reasoning_error", "text": "The response contradicts information present in the retrieved documents." } ] },
+        { "type": "subheading", "text": "Incident Severity" },
+        { "type": "bullets", "items": [ "SEV-1 — Critical. Harmful or dangerously incorrect response.", "SEV-2 — High. Significant hallucination or policy violation in a high-traffic agent.", "SEV-3 — Medium. Reliability below threshold but response is not harmful.", "SEV-4 — Low. Minor retrieval or grounding issue.", "SEV-5 — Informational. Logged for trend analysis, no action required." ] },
+        { "type": "callout", "title": "Score thresholds in production", "text": "A score of 85 or above generally means the response is safe to return to users. Between 50 and 85, consider hedging. Below 50, TraceDog issues an abstain recommendation — do not return the response.", "variant": "insight" },
+        { "type": "cards", "title": "Using the score in production", "items": [ { "title": "Blocking", "text": "Check `result.abstain` after each `trace_run()`. Return a fallback message when abstain is true." }, { "title": "Hedging", "text": "When reliability is between 50 and 84, append a disclaimer like \"This answer may be incomplete.\"" }, { "title": "Routing", "text": "Route low-reliability traces to a human review queue or a more capable model." } ] }
+      ]
+    },
+    {
+      "id": "policies",
+      "title": "Policies & Guardrails",
+      "eyebrow": "Automated Controls",
+      "lead": "Policies let you define rules that run automatically on every trace. When a trace breaches a threshold, TraceDog takes the action you configured.",
+      "blocks": [
+        { "type": "subheading", "text": "How Policies Work" },
+        { "type": "paragraph", "text": "Every ingested trace is evaluated against all active policies in your organization. If the trace matches a policy condition, TraceDog executes the configured action and attaches the result to the trace." },
+        { "type": "cards", "title": "Action Types", "items": [ { "title": "warn", "text": "Logs the policy breach. The trace status stays completed. Use this for monitoring without blocking." }, { "title": "block", "text": "Sets the trace status to blocked and sets abstain: true on the response. The SDK surfaces this to your application." }, { "title": "escalate", "text": "Creates an alert in TraceDog and fires a webhook to your on-call system. Use this for SEV-1 or SEV-2 failure types." } ] },
+        { "type": "subheading", "text": "Policy Rule Structure" },
+        { "type": "code", "title": "Policy object schema", "code": "{\n  \"name\": \"block-high-hallucination\",\n  \"enabled\": true,\n  \"condition\": {\n    \"field\": \"hallucination_risk\",\n    \"operator\": \"gt\",\n    \"threshold\": 0.6\n  },\n  \"action\": \"block\"\n}" },
+        { "type": "subheading", "text": "Example Policies" },
+        { "type": "code", "title": "Warn when hallucination risk exceeds 0.6", "code": "{\n  \"name\": \"warn-hallucination-risk\",\n  \"enabled\": true,\n  \"condition\": { \"field\": \"hallucination_risk\", \"operator\": \"gt\", \"threshold\": 0.6 },\n  \"action\": \"warn\"\n}" },
+        { "type": "code", "title": "Block when more than 3 unsupported claims", "code": "{\n  \"name\": \"block-unsupported-claims\",\n  \"enabled\": true,\n  \"condition\": { \"field\": \"unsupported_claim_count\", \"operator\": \"gt\", \"threshold\": 3 },\n  \"action\": \"block\"\n}" },
+        { "type": "endpoints", "items": [ { "method": "POST", "path": "/v1/policies" }, { "method": "GET", "path": "/v1/policies" } ] },
+        { "type": "code", "title": "curl — create a policy", "code": "curl -X POST https://api.tracedog.io/v1/policies \\\n  -H \"Authorization: Bearer $TRACEDOG_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"block-high-hallucination\",\n    \"enabled\": true,\n    \"condition\": {\n      \"field\": \"hallucination_risk\",\n      \"operator\": \"gt\",\n      \"threshold\": 0.6\n    },\n    \"action\": \"block\"\n  }'" },
+        { "type": "code", "title": "Python — create a policy", "code": "import httpx, os\n\nclient = httpx.Client(\n    base_url=\"https://api.tracedog.io/v1\",\n    headers={\"Authorization\": f\"Bearer {os.environ['TRACEDOG_API_KEY']}\"},\n)\n\npolicy = client.post(\n    \"/policies\",\n    json={\n        \"name\": \"block-high-hallucination\",\n        \"enabled\": True,\n        \"condition\": {\"field\": \"hallucination_risk\", \"operator\": \"gt\", \"threshold\": 0.6},\n        \"action\": \"block\",\n    },\n).json()\nprint(policy[\"policy_id\"])  # pol_xyz789" },
+        { "type": "callout", "title": "Policies are org-scoped", "text": "All policies apply to every trace ingested by your organization. Use naming conventions like `prod:block-hallucination` to stay organized across environments.", "variant": "insight" }
+      ]
+    },
+    {
+      "id": "api-reference",
+      "title": "API Reference",
+      "eyebrow": "REST API",
+      "lead": "All TraceDog functionality is available via REST API. The base URL for all requests is `https://api.tracedog.io/v1`.",
+      "blocks": [
+        { "type": "subheading", "text": "Base URL & Auth" },
+        { "type": "code", "title": "", "code": "https://api.tracedog.io/v1\nAuthorization: Bearer <API_KEY>" },
+        { "type": "subheading", "text": "Rate Limits" },
+        { "type": "bullets", "items": [ "Ingest endpoints: 1,000 requests/min per org.", "Query endpoints: 100 requests/min per org.", "Exceeding the limit returns 429 Too Many Requests.", "Rate limit headers: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset." ] },
+        { "type": "subheading", "text": "Pagination" },
+        { "type": "paragraph", "text": "List endpoints accept `limit` (max 100, default 20) and `offset` (default 0). The response includes a `total` count." },
+        { "type": "subheading", "text": "All Endpoints" },
+        { "type": "endpoints", "items": [ { "method": "POST", "path": "/v1/traces" }, { "method": "POST", "path": "/v1/traces/batch" }, { "method": "GET", "path": "/v1/traces" }, { "method": "GET", "path": "/v1/traces/{trace_id}" }, { "method": "GET", "path": "/v1/traces/{trace_id}/claims" }, { "method": "GET", "path": "/v1/traces/{trace_id}/tools" }, { "method": "GET", "path": "/v1/metrics/overview" }, { "method": "GET", "path": "/v1/policies" }, { "method": "POST", "path": "/v1/policies" }, { "method": "PATCH", "path": "/v1/policies/{id}" }, { "method": "GET", "path": "/v1/alerts" } ] },
+        { "type": "subheading", "text": "POST /v1/traces" },
+        { "type": "paragraph", "text": "Ingest a single trace. Returns the trace ID and reliability scores synchronously." },
+        { "type": "code", "title": "Request body", "code": "{\n  \"agent_name\": \"support-bot\",\n  \"environment\": \"prod\",\n  \"model\": \"gpt-4\",\n  \"prompt\": \"What is the refund policy?\",\n  \"response\": \"Refunds take 2 days.\",\n  \"retrieved_docs\": [\n    {\n      \"doc_id\": \"doc_1\",\n      \"content_snippet\": \"Our policy allows returns within 30 days...\",\n      \"relevance_score\": 0.87\n    }\n  ],\n  \"tool_calls\": [],\n  \"latency_ms\": 842\n}" },
+        { "type": "code", "title": "Response", "code": "{\n  \"trace_id\": \"tr_abc123\",\n  \"reliability_score\": 91,\n  \"grounding_score\": 0.88,\n  \"hallucination_risk\": 0.12,\n  \"abstain\": false,\n  \"failure_type\": null,\n  \"status\": \"completed\"\n}" },
+        { "type": "subheading", "text": "GET /v1/traces" },
+        { "type": "bullets", "items": [ "`agent` — filter by agent name", "`status` — completed | blocked | error", "`min_reliability` — minimum reliability score (0–100)", "`limit` — max 100", "`offset` — pagination offset" ] },
+        { "type": "subheading", "text": "GET /v1/traces/{trace_id}/claims" },
+        { "type": "code", "title": "Response", "code": "{\n  \"trace_id\": \"tr_abc123\",\n  \"claims\": [\n    {\n      \"claim_id\": \"clm_1\",\n      \"text\": \"Refunds take 2 business days.\",\n      \"supported\": false,\n      \"confidence\": 0.21,\n      \"supporting_doc_ids\": []\n    },\n    {\n      \"claim_id\": \"clm_2\",\n      \"text\": \"Returns accepted within 30 days.\",\n      \"supported\": true,\n      \"confidence\": 0.94,\n      \"supporting_doc_ids\": [\"doc_1\"]\n    }\n  ]\n}" },
+        { "type": "subheading", "text": "GET /v1/metrics/overview" },
+        { "type": "code", "title": "Response", "code": "{\n  \"total_traces\": 14832,\n  \"avg_reliability_score\": 82.4,\n  \"abstain_rate\": 0.07,\n  \"failure_type_counts\": {\n    \"hallucination\": 312,\n    \"retrieval_failure\": 88,\n    \"tool_misuse\": 41\n  }\n}" },
+        { "type": "cards", "title": "Common Error Codes", "items": [ { "title": "400 Bad Request", "text": "Required fields missing or malformed. Check error.details in the response body." }, { "title": "401 Unauthorized", "text": "API key is missing, invalid, or revoked." }, { "title": "403 Forbidden", "text": "Key lacks the required scope." }, { "title": "404 Not Found", "text": "trace_id or policy_id does not exist in your organization." }, { "title": "429 Too Many Requests", "text": "Rate limit exceeded. Retry after X-RateLimit-Reset." }, { "title": "422 Unprocessable Entity", "text": "Request fails schema validation. Check environment is one of prod | staging | dev." } ] }
+      ]
+    }
+  ]
+}
