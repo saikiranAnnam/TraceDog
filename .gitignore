@@ -1,5 +1,8 @@
+
+# Env files (secrets, machine-specific URLs — includes dashboard/.env.local)
 .env
 .env.local
+.env.example
 .DS_Store
 __pycache__/
 *.pyc
@@ -7,6 +10,7 @@ __pycache__/
 venv/
 node_modules/
 .next/
+CLAUDE.md
 
 # Pulumi (IaC) state/config
 .pulumi/
