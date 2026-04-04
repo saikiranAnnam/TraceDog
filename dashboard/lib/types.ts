@@ -17,6 +17,7 @@ export type TraceListItem = {
   eval_cache_hit?: boolean | null;
   /** SEV-1 … SEV-5 incident severity when present */
   severity?: string | null;
+  is_eval?: boolean;
 };
 
 export type TraceSpan = {
@@ -54,6 +55,7 @@ export type ClaimGroundingItem = {
   label: string;
   grounding_mode?: string | null;
   short_answer_flag?: boolean | null;
+  responsible_span_id?: string | null;
 };
 
 export type TraceDetail = TraceListItem & {
@@ -80,4 +82,48 @@ export type TraceDetail = TraceListItem & {
   failure_reason?: string | null;
   /** Hybrid scorer + RCA + repair policy (API `reliability_insights`). */
   reliability_insights?: Record<string, unknown> | null;
+};
+
+export type AgentMetricsTrendDay = {
+  date: string;
+  trace_count: number;
+  avg_reliability_score: number | null;
+  avg_hallucination_risk: number | null;
+  avg_grounding_score: number | null;
+};
+
+export type AgentMetrics = {
+  agent_name: string;
+  environment: string;
+  window: string;
+  trace_count: number;
+  aggregates: {
+    avg_reliability_score: number | null;
+    avg_hallucination_risk: number | null;
+    avg_grounding_score: number | null;
+  };
+  failure_type_counts: Record<string, number>;
+  severity_level_counts: Record<string, number>;
+  trend_by_day: AgentMetricsTrendDay[];
+};
+
+export type ExecutionGraphNode = {
+  id: string;
+  span_db_id: number;
+  span_type: string;
+  label: string | null;
+  status: string | null;
+  duration_ms: number | null;
+  position: number;
+};
+
+export type ExecutionGraphEdge = {
+  source: string;
+  target: string;
+};
+
+export type ExecutionGraphPayload = {
+  trace_id: string;
+  nodes: ExecutionGraphNode[];
+  edges: ExecutionGraphEdge[];
 };

@@ -1,4 +1,4 @@
-import { fetchTraces } from "@/lib/api";
+import { fetchTraces, resolveApiOrigin } from "@/lib/api";
 import { TracesDecisionDashboard } from "@/components/traces/traces-decision-dashboard";
 
 export default async function TracesPage() {
@@ -17,7 +17,12 @@ export default async function TracesPage() {
         <p className="td-traces-error">{err}</p>
         <p className="tdv-section-sub td-traces-hero-sub">
           Start API: <code>docker compose -f infra/docker-compose.yml up</code> or{" "}
-          <code>uvicorn</code> with Postgres. Set <code>NEXT_PUBLIC_API_URL</code> if needed.
+          <code>uvicorn</code> with Postgres. Set <code>NEXT_PUBLIC_API_URL</code> to the same
+          origin your API listens on (e.g. <code>http://127.0.0.1:8000</code>), then restart{" "}
+          <code>npm run dev</code>.
+        </p>
+        <p className="tdv-section-sub td-traces-hero-sub">
+          Resolved API base: <code>{resolveApiOrigin()}</code>
         </p>
       </div>
     );

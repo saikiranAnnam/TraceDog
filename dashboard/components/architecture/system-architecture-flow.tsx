@@ -38,53 +38,53 @@ export function SystemArchitectureFlow() {
     const nodes: Node[] = [
       {
         id: "clients",
-        position: { x: 0, y: 24 },
+        position: { x: 0, y: 32 },
         data: {
           label: "Clients",
           sub: "SDK · agents · eval runners",
         },
         type: "arch",
-        style: { width: 160, height: 76 },
+        style: { width: 186, height: 90 },
       },
       {
         id: "api",
-        position: { x: 200, y: 16 },
+        position: { x: 260, y: 20 },
         data: {
           label: "TraceDog API",
           sub: "POST /api/v1/traces",
         },
         type: "arch",
-        style: { width: 168, height: 92 },
+        style: { width: 205, height: 106 },
       },
       {
         id: "score",
-        position: { x: 408, y: 8 },
+        position: { x: 550, y: 10 },
         data: {
           label: "Reliability layer",
           sub: "Hybrid scorer · CGGE · grounding layers",
         },
         type: "arch",
-        style: { width: 200, height: 100 },
+        style: { width: 245, height: 116 },
       },
       {
         id: "db",
-        position: { x: 640, y: 20 },
+        position: { x: 860, y: 24 },
         data: {
           label: "PostgreSQL",
           sub: "traces · scores · metadata",
         },
         type: "arch",
-        style: { width: 152, height: 84 },
+        style: { width: 182, height: 94 },
       },
       {
         id: "dash",
-        position: { x: 820, y: 24 },
+        position: { x: 1100, y: 30 },
         data: {
           label: "Dashboard",
           sub: "Next.js · overview · traces",
         },
         type: "arch",
-        style: { width: 160, height: 76 },
+        style: { width: 190, height: 90 },
       },
     ];
 
@@ -112,7 +112,7 @@ export function SystemArchitectureFlow() {
   const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
   return (
-    <div className="arch-flow-wrap" style={{ width: "100%", height: 320 }}>
+    <div className="arch-flow-wrap" style={{ width: "100%", height: 420 }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -120,7 +120,7 @@ export function SystemArchitectureFlow() {
         onEdgesChange={onEdgesChange}
         nodeTypes={archNodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+        fitViewOptions={{ padding: 0.24, maxZoom: 1 }}
         minZoom={0.5}
         maxZoom={1}
         proOptions={{ hideAttribution: true }}

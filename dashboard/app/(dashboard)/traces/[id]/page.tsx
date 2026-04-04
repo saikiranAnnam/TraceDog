@@ -1,6 +1,6 @@
 import { TraceDetailView } from "@/components/traces/trace-detail-view";
-import { fetchClaimGraph, fetchTrace } from "@/lib/api";
-import type { ClaimGraphPayload } from "@/lib/types";
+import { fetchClaimGraph, fetchExecutionGraph, fetchTrace } from "@/lib/api";
+import type { ClaimGraphPayload, ExecutionGraphPayload } from "@/lib/types";
 import Link from "next/link";
 
 export default async function TraceDetailPage({
@@ -33,5 +33,12 @@ export default async function TraceDetailPage({
     claimGraph = null;
   }
 
-  return <TraceDetailView t={t} claimGraph={claimGraph} />;
+  let executionGraph: ExecutionGraphPayload | null = null;
+  try {
+    executionGraph = await fetchExecutionGraph(params.id);
+  } catch {
+    executionGraph = null;
+  }
+
+  return <TraceDetailView t={t} claimGraph={claimGraph} executionGraph={executionGraph} />;
 }

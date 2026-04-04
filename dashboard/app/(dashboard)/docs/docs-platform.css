@@ -455,8 +455,8 @@ html[data-theme="dark"] .docs-platform {
 
 /* Flow strip */
 .docs-flow {
-  margin: 1.25rem 0 1.5rem;
-  padding: 1rem 1.1rem;
+  margin: 1.5rem 0 1.75rem;
+  padding: 1.2rem 1.35rem;
   border-radius: var(--docs-radius);
   border: 1px solid var(--docs-border);
   background: linear-gradient(180deg, var(--td-surface-muted) 0%, var(--td-surface) 100%);
@@ -467,28 +467,32 @@ html[data-theme="dark"] .docs-platform {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem 0.5rem;
-  font-size: 0.8125rem;
+  justify-content: center;
+  gap: 0.55rem 0.85rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .docs-flow-node {
-  padding: 0.25rem 0.55rem;
-  border-radius: 6px;
+  padding: 0.45rem 0.78rem;
+  border-radius: 8px;
   background: var(--td-surface-muted);
   border: 1px solid var(--docs-border);
   color: var(--td-text);
-  font-weight: 500;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .docs-flow-arrow {
   color: var(--td-faint);
-  font-weight: 400;
+  font-weight: 600;
+  opacity: 0.9;
 }
 
 .docs-flow--hero {
-  margin: 1.5rem auto 0;
-  max-width: 44rem;
-  padding: 1.35rem 1.25rem;
+  margin: 1.75rem auto 0.4rem;
+  max-width: 62rem;
+  padding: 1.65rem 1.5rem;
   text-align: center;
   border: 1px solid rgba(88, 166, 255, 0.28);
   box-shadow:
@@ -499,11 +503,28 @@ html[data-theme="dark"] .docs-platform {
 
 .docs-flow--hero .docs-flow-track {
   justify-content: center;
+  gap: 0.7rem 1rem;
 }
 
 .docs-flow--hero .docs-flow-node {
-  font-size: 0.875rem;
-  padding: 0.35rem 0.65rem;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.9rem;
+}
+
+@media (max-width: 900px) {
+  .docs-flow--hero {
+    max-width: 100%;
+    padding: 1.2rem 1rem;
+  }
+
+  .docs-flow-track {
+    justify-content: flex-start;
+    gap: 0.45rem 0.6rem;
+  }
+
+  .docs-flow-node {
+    white-space: normal;
+  }
 }
 
 /* Endpoint line */
@@ -756,6 +777,45 @@ html[data-theme="light"] .docs-live-details {
   font-size: 0.72rem;
   line-height: 1.45;
   color: var(--td-text-secondary);
+}
+
+/* Claim graph visual step pipeline */
+.docs-cg-steps {
+  margin: 0.9rem 0 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
+  max-width: 52rem;
+}
+
+.docs-cg-step {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.68rem 0.8rem;
+  border: 1px solid var(--docs-border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--td-surface-muted) 0%, var(--td-surface) 100%);
+}
+
+.docs-cg-step-num {
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--td-heading);
+  background: rgba(88, 166, 255, 0.18);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+}
+
+.docs-cg-step-label {
+  font-size: 0.92rem;
+  font-weight: 560;
+  color: var(--td-text);
 }
 
 /* Command palette */
